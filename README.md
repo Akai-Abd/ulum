@@ -175,3 +175,4 @@ tests/unit/test_system_and_config.py ..
 ## 📄 License
 
 Distributed under the [MIT License](LICENSE). Built with Python, Typer, Rich, GTK3, and WebKit2.
+**Build by Abdurrahman**
