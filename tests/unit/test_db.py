@@ -98,3 +98,18 @@ def test_delete_application_and_prune(temp_db):
     repo.save_applications([app1], prune_source="apt")
     assert repo.get_application_by_id("apt:curl") is not None
     assert repo.get_application_by_id("apt:vim") is None
+
+def test_delete_updates(temp_db):
+    repo, _ = temp_db
+    app1 = ApplicationRecord(SourceType.APT, ScopeType.SYSTEM, "curl", "curl", "7.88.1")
+    app2 = ApplicationRecord(SourceType.FLATPAK, ScopeType.USER, "org.app", "app", "1.0")
+    repo.save_updates([UpdateRecord(app1, "7.88.2"), UpdateRecord(app2, "1.1")])
+    assert len(repo.get_updates()) == 2
+
+    repo.delete_update("apt", "curl")
+    upds = repo.get_updates()
+    assert len(upds) == 1
+    assert upds[0]["package_id"] == "org.app"
+
+    repo.delete_updates_by_source("flatpak")
+    assert len(repo.get_updates()) == 0

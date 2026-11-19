@@ -82,13 +82,14 @@ class AptAdapter(BaseAdapter):
         return updates
 
     def build_update_command(self, targets: Optional[Sequence[str]] = None) -> List[str]:
+        dpkg_opts = ["-o", "Dpkg::Options::=--force-confdef", "-o", "Dpkg::Options::=--force-confold"]
         if targets:
-            return ["apt-get", "install", "--only-upgrade", "-y"] + list(targets)
-        return ["apt-get", "dist-upgrade", "-y"]
+            return ["apt-get", "install", "--only-upgrade", "-y"] + dpkg_opts + list(targets)
+        return ["apt-get", "dist-upgrade", "-y"] + dpkg_opts
 
     def execute_update(self, targets: Optional[Sequence[str]] = None) -> ExecutionResult:
         cmd = self.build_update_command(targets)
-        res = run_cmd(cmd, require_root=True)
+        res = run_cmd(cmd, require_root=True, env={"DEBIAN_FRONTEND": "noninteractive"})
         return ExecutionResult(
             success=(res.returncode == 0),
             exit_code=res.returncode,
@@ -106,6 +107,7 @@ class AptAdapter(BaseAdapter):
         packages_to_remove = [target.package_id]
         dependencies_to_remove: List[str] = []
         safety_warnings: List[str] = []
+        has_critical_rdeps = False
 
         # Check reverse dependencies
         rdep_res = run_cmd(["apt-cache", "rdepends", "--installed", target.package_id])
@@ -113,6 +115,7 @@ class AptAdapter(BaseAdapter):
             lines = [l.strip() for l in rdep_res.stdout.splitlines() if l.strip() and not l.startswith(target.package_id)]
             rdeps = [l for l in lines if not l.startswith("<") and not l.endswith(":")]
             if rdeps:
+                has_critical_rdeps = True
                 safety_warnings.append(
                     f"Warning: {len(rdeps)} installed package(s) depend on {target.package_id}: {', '.join(rdeps[:5])}"
                 )
@@ -145,7 +148,7 @@ class AptAdapter(BaseAdapter):
             cleanup_items=cleanup_items,
             preserved_items=["Personal documents in ~", "/etc/systemd/*"],
             safety_warnings=safety_warnings,
-            is_safe=(len(safety_warnings) == 0 or "Warning" in safety_warnings[0]),
+            is_safe=(not has_critical_rdeps and len(safety_warnings) == 0),
         )
 
     def execute_native_removal(self, plan: RemovalPlan) -> ExecutionResult:

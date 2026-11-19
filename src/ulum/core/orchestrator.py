@@ -77,6 +77,10 @@ class Orchestrator:
             from ulum.core.system import create_system_snapshot
             ok, msg = create_system_snapshot("Pre-update backup via ULUM")
             logger.info("System snapshot status: %s (%s)", "Created" if ok else "Skipped/Failed", msg)
+            if not ok:
+                err = f"Pre-update snapshot failed: {msg}"
+                logger.error(err)
+                return [("system", ExecutionResult(success=False, exit_code=1, stderr=err, error_summary=err))]
 
         results: List[Tuple[str, ExecutionResult]] = []
         active_adapters = self.get_available_adapters()
@@ -102,6 +106,9 @@ class Orchestrator:
                     else:
                         res = adapter.execute_update(pkgs)
                     finished = datetime.datetime.now(datetime.timezone.utc).isoformat()
+                    if res.success and not dry_run:
+                        for pkg in pkgs:
+                            self.repo.delete_update(src, pkg)
                     for pkg in pkgs:
                         self.repo.record_update_history(
                             source=src,
@@ -127,6 +134,8 @@ class Orchestrator:
                     else:
                         res = adapter.execute_update()
                     finished = datetime.datetime.now(datetime.timezone.utc).isoformat()
+                    if res.success and not dry_run:
+                        self.repo.delete_updates_by_source(src)
                     self.repo.record_update_history(
                         source=src,
                         package_id="<bulk>",

@@ -929,6 +929,26 @@
   </div>
 
   <script>
+    // Hook fetch to transparently include auth token
+    const _origFetch = window.fetch;
+    window.fetch = function(url, init = {}) {
+      init.headers = init.headers || {};
+      if (window.ULUM_TOKEN && typeof init.headers === 'object' && !(init.headers instanceof Headers)) {
+        init.headers['X-ULUM-Token'] = window.ULUM_TOKEN;
+      }
+      return _origFetch(url, init);
+    };
+
+    function escapeHtml(str) {
+      if (str == null) return '';
+      return String(str)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#39;');
+    }
+
     let currentTab = 'dashboard';
     let currentSourceFilter = 'all';
     let allUpdates = [];
@@ -1073,14 +1093,20 @@
 
         cands.forEach(c => {
           const tr = document.createElement('tr');
+          const safePath = escapeHtml(c.path);
+          const safeType = escapeHtml(c.candidate_type);
+          const safeConf = escapeHtml(c.confidence);
+          const safeSize = escapeHtml(c.formatted_size || '0 B');
+          const safeEvid = escapeHtml(c.evidence);
           tr.innerHTML = `
-            <td style="color:#f87171;font-family:monospace;font-size:12px;">${c.path}</td>
-            <td><span class="source-badge apt">${c.candidate_type}</span></td>
-            <td><b style="color:${c.confidence === 'verified' ? '#10b981' : '#facc15'}">${c.confidence.toUpperCase()}</b></td>
-            <td>${c.formatted_size || '0 B'}</td>
-            <td style="color:#94a3b8;font-size:12px;">${c.evidence}</td>
-            <td><button class="btn-action-dark danger" onclick="handleCleanOne('${c.path}')">Delete</button></td>
+            <td style="color:#f87171;font-family:monospace;font-size:12px;">${safePath}</td>
+            <td><span class="source-badge apt">${safeType}</span></td>
+            <td><b style="color:${c.confidence === 'verified' ? '#10b981' : '#facc15'}">${safeConf.toUpperCase()}</b></td>
+            <td>${safeSize}</td>
+            <td style="color:#94a3b8;font-size:12px;">${safeEvid}</td>
+            <td><button class="btn-action-dark danger btn-clean-one">Delete</button></td>
           `;
+          tr.querySelector('.btn-clean-one').addEventListener('click', () => handleCleanOne(c.path));
           tbody.appendChild(tr);
         });
         return;
@@ -1112,12 +1138,12 @@
           const tr = document.createElement('tr');
           const isOk = h.status === 'success';
           tr.innerHTML = `
-            <td>#${h.id}</td>
-            <td><span class="source-badge ${h.source}">${h.source.toUpperCase()}</span></td>
-            <td><b>${h.package_id}</b></td>
-            <td><span class="status-text ${isOk ? 'uptodate' : 'update-avail'}">${h.status}</span></td>
-            <td style="color:#94a3b8;font-size:12px;">${(h.started_at || '').substring(0, 19)}</td>
-            <td style="color:#64748b;font-size:11px;">Exit: ${h.exit_code}</td>
+            <td>#${escapeHtml(h.id)}</td>
+            <td><span class="source-badge ${escapeHtml(h.source)}">${escapeHtml(h.source).toUpperCase()}</span></td>
+            <td><b>${escapeHtml(h.package_id)}</b></td>
+            <td><span class="status-text ${isOk ? 'uptodate' : 'update-avail'}">${escapeHtml(h.status)}</span></td>
+            <td style="color:#94a3b8;font-size:12px;">${escapeHtml((h.started_at || '').substring(0, 19))}</td>
+            <td style="color:#64748b;font-size:11px;">Exit: ${escapeHtml(h.exit_code)}</td>
           `;
           tbody.appendChild(tr);
         });
@@ -1226,29 +1252,49 @@
 
       rows.forEach(r => {
         const tr = document.createElement('tr');
-        const sourceClass = r.source.toLowerCase();
+        const sourceClass = escapeHtml(r.source.toLowerCase());
+        const safeName = escapeHtml(r.name);
+        const safeSource = escapeHtml(r.source);
+        const safeInstVer = escapeHtml(r.installed_version);
+        const safeAvailVer = escapeHtml(r.available_version);
         const statusHtml = r.is_update
           ? `<span class="status-text update-avail">Update available</span>`
           : `<span class="status-text uptodate">Up to date</span>`;
-
-        const actionHtml = r.is_update
-          ? `<button class="btn-action-update" onclick="handleUpdate('${r.qualified_id}')">Update</button>`
-          : `<button class="btn-action-dark" onclick="handleReinstall('${r.qualified_id}')">Reinstall</button>
-             <button class="btn-action-dark danger" onclick="handleUninstall('${r.qualified_id}')">Uninstall</button>`;
 
         tr.innerHTML = `
           <td>
             <div class="app-cell">
               <div class="app-icon">${getAppIcon(r.name)}</div>
-              <span>${r.name}</span>
+              <span>${safeName}</span>
             </div>
           </td>
-          <td><span class="source-badge ${sourceClass}">${r.source.toUpperCase()}</span></td>
-          <td>${r.installed_version}</td>
-          <td style="${r.is_update ? '' : 'color:#10b981;'}">${r.available_version}</td>
+          <td><span class="source-badge ${sourceClass}">${safeSource.toUpperCase()}</span></td>
+          <td>${safeInstVer}</td>
+          <td style="${r.is_update ? '' : 'color:#10b981;'}">${safeAvailVer}</td>
           <td>${statusHtml}</td>
-          <td>${actionHtml}</td>
+          <td class="action-cell"></td>
         `;
+        const actionCell = tr.querySelector('.action-cell');
+        if (r.is_update) {
+          const btn = document.createElement('button');
+          btn.className = 'btn-action-update';
+          btn.textContent = 'Update';
+          btn.addEventListener('click', () => handleUpdate(r.qualified_id));
+          actionCell.appendChild(btn);
+        } else {
+          const btnReinstall = document.createElement('button');
+          btnReinstall.className = 'btn-action-dark';
+          btnReinstall.textContent = 'Reinstall';
+          btnReinstall.addEventListener('click', () => handleReinstall(r.qualified_id));
+          actionCell.appendChild(btnReinstall);
+
+          const btnUninstall = document.createElement('button');
+          btnUninstall.className = 'btn-action-dark danger';
+          btnUninstall.textContent = 'Uninstall';
+          btnUninstall.style.marginLeft = '6px';
+          btnUninstall.addEventListener('click', () => handleUninstall(r.qualified_id));
+          actionCell.appendChild(btnUninstall);
+        }
         tbody.appendChild(tr);
       });
     }

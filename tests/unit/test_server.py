@@ -1,5 +1,6 @@
 import json
 import threading
+import urllib.error
 import urllib.request
 from pathlib import Path
 from ulum.core.config import UlumConfig
@@ -69,5 +70,17 @@ def test_api_server_endpoints(temp_db, tmp_path, monkeypatch):
       assert res.status == 200
       assert json.loads(res.read().decode("utf-8"))["deleted"] == 1
     assert not cand_file.exists()
+
+    # 6. Test that external Origin is rejected with HTTP 403
+    bad_req = urllib.request.Request(
+        f"{base_url}/api/settings",
+        data=b"{}",
+        headers={"Content-Type": "application/json", "Origin": "https://malicious-website.com"},
+    )
+    try:
+        urllib.request.urlopen(bad_req)
+        assert False, "Expected HTTP 403 Forbidden"
+    except urllib.error.HTTPError as e:
+        assert e.code == 403
 
     server.shutdown()

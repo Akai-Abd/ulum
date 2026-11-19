@@ -44,5 +44,9 @@ excluded_packages = [{excluded_str}]
 require_confirmation = {str(config.require_confirmation).lower()}
 log_level = "{config.log_level}"
 """
-    with open(path, "w", encoding="utf-8") as f:
+    tmp_path = path.with_suffix(".tmp")
+    with open(tmp_path, "w", encoding="utf-8") as f:
         f.write(content)
+        f.flush()
+        os.fsync(f.fileno())
+    os.replace(tmp_path, path)

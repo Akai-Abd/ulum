@@ -36,7 +36,7 @@ class RemovalPlanner:
             total_bytes += item.estimated_size_bytes
             verified_items.append(item)
 
-        is_safe = raw_plan.is_safe and not any("Critical" in w for w in warnings)
+        is_safe = raw_plan.is_safe and not any("critical" in w.lower() for w in warnings)
 
         return RemovalPlan(
             application=target,

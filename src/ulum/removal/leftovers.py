@@ -82,7 +82,8 @@ class LeftoverScanner:
                         if name_lower in GENERIC_SYSTEM_DIRS:
                             continue
                         if name_lower in installed_pkg_ids or any(
-                            pkg.startswith(name_lower) or name_lower.startswith(pkg)
+                            (len(name_lower) >= 3 and (pkg.startswith(f"{name_lower}-") or pkg.startswith(f"{name_lower}_")))
+                            or (len(pkg) >= 3 and (name_lower.startswith(f"{pkg}-") or name_lower.startswith(f"{pkg}_")))
                             for pkg in installed_pkg_ids
                         ):
                             continue

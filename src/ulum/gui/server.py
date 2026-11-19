@@ -1,6 +1,7 @@
 import http.server
 import json
 import os
+import secrets
 import socketserver
 from pathlib import Path
 from typing import Any, Dict
@@ -27,24 +28,38 @@ class UlumApiHandler(http.server.BaseHTTPRequestHandler):
     repo: Repository
     config: UlumConfig
     orchestrator: Orchestrator
+    auth_token: str = ""
 
     def log_message(self, format: str, *args: Any) -> None:
         logger.debug(f"HTTP: {format % args}")
+
+    def _is_local_origin(self, origin: str) -> bool:
+        if not origin:
+            return True
+        return origin.startswith("http://127.0.0.1") or origin.startswith("http://localhost")
 
     def send_json(self, data: Any, status: int = 200) -> None:
         payload = json.dumps(data).encode("utf-8")
         self.send_response(status)
         self.send_header("Content-Type", "application/json")
         self.send_header("Content-Length", str(len(payload)))
-        self.send_header("Access-Control-Allow-Origin", "*")
+        origin = self.headers.get("Origin")
+        if origin and self._is_local_origin(origin):
+            self.send_header("Access-Control-Allow-Origin", origin)
         self.end_headers()
         self.wfile.write(payload)
 
     def do_OPTIONS(self) -> None:
+        origin = self.headers.get("Origin")
+        if origin and not self._is_local_origin(origin):
+            self.send_response(403)
+            self.end_headers()
+            return
         self.send_response(204)
-        self.send_header("Access-Control-Allow-Origin", "*")
+        if origin and self._is_local_origin(origin):
+            self.send_header("Access-Control-Allow-Origin", origin)
         self.send_header("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
-        self.send_header("Access-Control-Allow-Headers", "Content-Type")
+        self.send_header("Access-Control-Allow-Headers", "Content-Type, X-ULUM-Token")
         self.end_headers()
 
     def do_GET(self) -> None:
@@ -55,7 +70,10 @@ class UlumApiHandler(http.server.BaseHTTPRequestHandler):
         if path == "/" or path == "/index.html":
             html_file = WEB_DIR / "index.html"
             if html_file.exists():
-                content = html_file.read_bytes()
+                text = html_file.read_text(encoding="utf-8")
+                token = getattr(self, "auth_token", "")
+                text = text.replace("<head>", f'<head><script>window.ULUM_TOKEN="{token}";</script>', 1)
+                content = text.encode("utf-8")
                 self.send_response(200)
                 self.send_header("Content-Type", "text/html; charset=utf-8")
                 self.send_header("Content-Length", str(len(content)))
@@ -165,6 +183,18 @@ class UlumApiHandler(http.server.BaseHTTPRequestHandler):
         self.send_error(404, "Endpoint not found")
 
     def do_POST(self) -> None:
+        origin = self.headers.get("Origin")
+        if origin and not self._is_local_origin(origin):
+            self.send_error(403, "Cross-origin requests forbidden")
+            return
+
+        expected_token = getattr(self, "auth_token", None)
+        if expected_token and (origin or self.headers.get("Referer")):
+            token = self.headers.get("X-ULUM-Token")
+            if not token or token != expected_token:
+                self.send_error(403, "Invalid or missing authorization token")
+                return
+
         parsed = urlparse(self.path)
         path = parsed.path
 
@@ -307,12 +337,16 @@ class ThreadedTCPServer(socketserver.ThreadingMixIn, socketserver.TCPServer):
     daemon_threads = True
 
 def create_server(repo: Repository, config: UlumConfig, orchestrator: Orchestrator, host: str = "127.0.0.1", port: int = 0) -> socketserver.TCPServer:
+    auth_token = secrets.token_hex(16)
+
     class BoundHandler(UlumApiHandler):
         pass
 
     BoundHandler.repo = repo
     BoundHandler.config = config
     BoundHandler.orchestrator = orchestrator
+    BoundHandler.auth_token = auth_token
 
     server = ThreadedTCPServer((host, port), BoundHandler)
+    server.auth_token = auth_token
     return server

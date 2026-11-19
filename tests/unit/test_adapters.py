@@ -102,3 +102,29 @@ def test_appimage_adapter(tmp_path, monkeypatch):
     res = adapter.execute_native_removal(plan)
     assert res.success is True
     assert not fake_app.exists()
+
+def test_appimage_removal_without_cached_location(tmp_path, monkeypatch):
+    from ulum.adapters.appimage import AppImageAdapter
+    from ulum.core.models import ApplicationRecord, ScopeType, SourceType
+    adapter = AppImageAdapter()
+    app_dir = tmp_path / "Applications"
+    app_dir.mkdir()
+    fake_app = app_dir / "Obsidian-1.5.AppImage"
+    fake_app.write_text("binary", encoding="utf-8")
+
+    monkeypatch.setattr(adapter, "_get_search_dirs", lambda: [app_dir])
+    monkeypatch.setattr("pathlib.Path.home", lambda: tmp_path)
+
+    app = ApplicationRecord(
+        source=SourceType.APPIMAGE,
+        source_scope=ScopeType.USER,
+        package_id="obsidian-1.5",
+        display_name="Obsidian",
+        installed_version="1.5",
+        install_location=None,
+    )
+    plan = adapter.build_removal_plan(app, complete=False)
+    assert plan.application.install_location == str(fake_app.resolve())
+    res = adapter.execute_native_removal(plan)
+    assert res.success is True
+    assert not fake_app.exists()

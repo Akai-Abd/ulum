@@ -108,13 +108,22 @@ class AppImageAdapter(BaseAdapter):
         if not loc:
             for sdir in self._get_search_dirs():
                 if sdir.exists():
-                    for ext in (".AppImage", ".appimage"):
-                        cand = sdir / f"{target.package_id}{ext}"
-                        if cand.exists():
-                            loc = str(cand.resolve())
-                            break
+                    try:
+                        for cand in sdir.iterdir():
+                            if cand.is_file() and cand.name.lower().endswith(".appimage"):
+                                if cand.stem.lower() == target.package_id.lower():
+                                    loc = str(cand.resolve())
+                                    break
+                    except (OSError, PermissionError):
+                        continue
                 if loc:
                     break
+
+        app_target = target
+        if loc and target.install_location != loc:
+            from dataclasses import replace
+            app_target = replace(target, install_location=loc)
+
         native_cmd = ["rm", "-f", loc] if loc else ["true"]
         cleanup_items: List[CleanupCandidate] = []
 
@@ -134,12 +143,12 @@ class AppImageAdapter(BaseAdapter):
                             candidate_type="desktop_entry" if cpath.suffix == ".desktop" else "config",
                             evidence=f"Associated with AppImage {target.package_id}",
                             confidence=ConfidenceLevel.VERIFIED,
-                            estimated_size_bytes=cpath.stat().st_size if cpath.is_file() else 0,
+                            estimated_size_bytes=0,
                         )
                     )
 
         return RemovalPlan(
-            application=target,
+            application=app_target,
             complete=complete,
             native_command=native_cmd,
             packages_to_remove=[target.package_id],
@@ -151,6 +160,8 @@ class AppImageAdapter(BaseAdapter):
 
     def execute_native_removal(self, plan: RemovalPlan) -> ExecutionResult:
         loc = plan.application.install_location
+        if not loc and len(plan.native_command) >= 3 and plan.native_command[0] == "rm" and plan.native_command[2] != "true":
+            loc = plan.native_command[2]
         if loc and os.path.exists(loc):
             try:
                 os.remove(loc)

@@ -317,15 +317,18 @@ def doctor_cmd(
 
     if fix:
         console.print("\n[bold yellow]Attempting automated package manager recovery...[/bold yellow]")
-        from ulum.utils.process import run_cmd
-        try:
-            console.print("  • Configuring pending packages (dpkg --configure -a)...")
-            run_cmd(["dpkg", "--configure", "-a"], require_root=True)
-            console.print("  • Resolving broken dependencies (apt-get install -f)...")
-            run_cmd(["apt-get", "install", "-f", "-y"], require_root=True)
-            console.print("[bold green]✓ Automated recovery tasks completed successfully.[/bold green]")
-        except Exception as e:
-            console.print(f"[bold red]Recovery encountered an error:[/bold red] {e}")
+        from ulum.utils.process import command_exists, run_cmd
+        if command_exists("dpkg") and command_exists("apt-get"):
+            try:
+                console.print("  • Configuring pending packages (dpkg --configure -a)...")
+                run_cmd(["dpkg", "--configure", "-a"], require_root=True)
+                console.print("  • Resolving broken dependencies (apt-get install -f)...")
+                run_cmd(["apt-get", "install", "-f", "-y"], require_root=True)
+                console.print("[bold green]✓ Automated recovery tasks completed successfully.[/bold green]")
+            except Exception as e:
+                console.print(f"[bold red]Recovery encountered an error:[/bold red] {e}")
+        else:
+            console.print("[yellow]Automated recovery is currently only available for Debian/Ubuntu (APT) systems.[/yellow]")
 
     console.print("\n[bold green]✓ Diagnostic check complete.[/bold green]")
 

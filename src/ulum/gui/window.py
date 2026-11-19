@@ -208,7 +208,7 @@ class MainWindow(Gtk.Window):
         filter_box.pack_start(self.search_entry, True, True, 0)
 
         self.source_combo = Gtk.ComboBoxText()
-        for s in ["All Sources", "apt", "flatpak", "snap"]:
+        for s in ["All Sources", "apt", "flatpak", "snap", "appimage"]:
             self.source_combo.append_text(s)
         self.source_combo.set_active(0)
         self.source_combo.connect("changed", lambda c: self.filter_installed())

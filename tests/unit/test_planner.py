@@ -54,3 +54,30 @@ def test_removal_planner_complete_with_valid_candidate(monkeypatch, tmp_path):
     assert len(plan.cleanup_items) == 1
     assert plan.cleanup_items[0].path == config_dir
     assert plan.estimated_freed_bytes > 0
+
+def test_removal_planner_critical_system_path_marked_unsafe(monkeypatch):
+    adapter = AptAdapter()
+    target = ApplicationRecord(
+        source=SourceType.APT,
+        source_scope=ScopeType.SYSTEM,
+        package_id="badtool",
+        display_name="badtool",
+        installed_version="1.0",
+    )
+    import ulum.adapters.apt as apt_module
+    import subprocess
+    from ulum.core.models import CleanupCandidate, ConfidenceLevel
+    monkeypatch.setattr(apt_module, "run_cmd", lambda cmd, **kwargs: subprocess.CompletedProcess(cmd, 0, "", ""))
+
+    # Force adapter to produce a cleanup candidate targeting a critical system path
+    orig_build = adapter.build_removal_plan
+    def mock_build_plan(t, complete=False):
+        raw = orig_build(t, complete=False)
+        raw.cleanup_items = [CleanupCandidate(path=Path("/etc"), candidate_type="config", evidence="system dir", confidence=ConfidenceLevel.VERIFIED)]
+        return raw
+
+    monkeypatch.setattr(adapter, "build_removal_plan", mock_build_plan)
+    planner = RemovalPlanner(adapter)
+    plan = planner.create_plan(target, complete=True)
+    assert not plan.is_safe
+    assert any("critical system directory" in w.lower() for w in plan.safety_warnings)
