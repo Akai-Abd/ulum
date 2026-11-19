@@ -7,6 +7,34 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [0.2.1] - 2026-11-20
+
+### 🛡️ Quality Audit & Performance Fixes
+
+- **Database Performance & Safe Pruning**:
+  - Replaced individual row insertion loops in `save_applications` with high-throughput batch `executemany` operations.
+  - Eliminated parameter overflow risk (`too many SQL variables`) on large APT inventories by replacing unbounded `DELETE ... NOT IN (?, ?, ...)` queries with single-query timestamp pruning (`DELETE ... WHERE source = ? AND last_scanned_at < ?`).
+
+- **Residual Scanner Accuracy & Desktop Safeguards**:
+  - Broadened generic desktop system protection list to prevent false leftover detection in user environments (`cinnamon`, `gnome-session`, `thumbnails`, `pip`, `mesa_shader_cache`, `evolution`, `nemo`, `nautilus`, etc.).
+  - Added prefix and substring matching against installed package IDs so active applications whose directory names differ slightly (e.g., `google-chrome` for `google-chrome-stable`, `libreoffice` for `libreoffice-core`) are not falsely flagged as leftovers.
+
+- **GUI Settings Persistence**:
+  - Added the AppImage toggle (`cfg-appimage`) to the desktop GUI settings panel, configuration state loader, and save handler, preventing AppImage support from being silently disabled when settings were saved from the WebKit dashboard.
+
+- **CLI Schedule Usability**:
+  - Changed default invocation of `ulum schedule` to safely query and display the active timer status instead of immediately writing systemd service and timer units without confirmation flags.
+
+- **AppImage Discovery & Removal Robustness**:
+  - Added permission and file error handling (`OSError`, `PermissionError`) when inspecting search directories.
+  - Added fallback search path resolution in `build_removal_plan` when an application lacks a cached install location.
+  - Included `~/.config/{package_id}` in complete removal plans for AppImages.
+
+- **Safety Validator Hardening**:
+  - Strengthened system directory blacklist validation to check child paths and parent containment against protected OS paths.
+
+---
+
 ## [0.2.0] - 2026-11-20
 
 ### 🚀 Enhancements & New Capabilities
