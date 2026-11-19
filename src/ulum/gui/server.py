@@ -1,3 +1,4 @@
+import getpass
 import http.server
 import json
 import os
@@ -11,6 +12,7 @@ from ulum.cli.display import format_bytes
 from ulum.core.config import UlumConfig
 from ulum.core.orchestrator import Orchestrator
 from ulum.core.system import detect_package_managers, get_system_info
+from ulum.db.database import get_db_path
 from ulum.db.repository import Repository
 from ulum.removal.leftovers import LeftoverScanner
 from ulum.removal.safety import SafetyValidator
@@ -97,11 +99,26 @@ class UlumApiHandler(http.server.BaseHTTPRequestHandler):
 
             total_leftover_bytes = sum(c.get("estimated_size", 0) for c in cands)
 
+            try:
+                username = getpass.getuser()
+            except Exception:
+                username = os.environ.get("USER", "user")
+
+            is_root = (os.geteuid() == 0) if hasattr(os, "geteuid") else False
+
+            try:
+                db_loc = str(get_db_path())
+            except Exception:
+                db_loc = "ulum.db"
+
             data = {
                 "version": __version__,
                 "distro_name": info.distro_name,
                 "distro_version": info.distro_version,
                 "arch": info.arch,
+                "user": username,
+                "is_root": is_root,
+                "db_path": db_loc,
                 "installed_count": len(apps),
                 "updates_count": len(upds),
                 "updates_by_source": counts_by_source,

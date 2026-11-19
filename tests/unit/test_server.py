@@ -25,6 +25,11 @@ def test_api_server_endpoints(temp_db, tmp_path, monkeypatch):
       assert res.status == 200
       html = res.read().decode("utf-8")
       assert "Universal Linux Update Manager (ULUM)" in html
+      assert 'id="btn-avatar"' in html
+      assert 'id="user-popover"' in html
+      assert 'id="btn-notifications"' in html
+      assert 'id="notif-badge"' in html
+      assert 'id="notif-popover"' in html
 
     # 2. Test GET /api/stats
     with urllib.request.urlopen(f"{base_url}/api/stats") as res:
@@ -33,6 +38,9 @@ def test_api_server_endpoints(temp_db, tmp_path, monkeypatch):
       assert "distro_name" in stats
       assert "installed_count" in stats
       assert "updates_count" in stats
+      assert "user" in stats
+      assert "is_root" in stats
+      assert "db_path" in stats
 
     # 3. Test GET /api/inventory
     with urllib.request.urlopen(f"{base_url}/api/inventory") as res:

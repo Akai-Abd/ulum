@@ -225,11 +225,16 @@
       cursor: pointer;
       color: var(--text-muted);
       transition: all 0.2s;
+      position: relative;
     }
 
     .icon-btn:hover {
       background: rgba(255, 255, 255, 0.1);
       color: #ffffff;
+    }
+
+    .icon-btn:active {
+      transform: scale(0.95);
     }
 
     .avatar-btn {
@@ -243,6 +248,70 @@
       font-size: 13px;
       font-weight: 700;
       color: #fff;
+      cursor: pointer;
+      user-select: none;
+      transition: transform 0.15s ease, box-shadow 0.15s ease;
+    }
+
+    .avatar-btn:hover {
+      transform: scale(1.06);
+      box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.45);
+    }
+
+    .avatar-btn:active {
+      transform: scale(0.95);
+    }
+
+    .topbar-dropdown-anchor {
+      position: relative;
+      display: inline-flex;
+    }
+
+    .notification-badge {
+      position: absolute;
+      top: -3px;
+      right: -3px;
+      min-width: 16px;
+      height: 16px;
+      padding: 0 4px;
+      border-radius: 8px;
+      background: #ef4444;
+      color: #ffffff;
+      font-size: 10px;
+      font-weight: 700;
+      line-height: 16px;
+      text-align: center;
+      box-shadow: 0 0 0 2px var(--bg-dark);
+      pointer-events: none;
+      display: none;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .dropdown-popover {
+      position: absolute;
+      top: calc(100% + 12px);
+      right: 0;
+      width: 300px;
+      background: #141a26;
+      border: 1px solid var(--card-border);
+      border-radius: 14px;
+      box-shadow: 0 16px 36px rgba(0, 0, 0, 0.65), 0 0 0 1px rgba(255, 255, 255, 0.05);
+      padding: 16px;
+      z-index: 1000;
+      display: none;
+      backdrop-filter: blur(16px);
+      color: var(--text-main);
+    }
+
+    .dropdown-popover.show {
+      display: block;
+      animation: popoverFadeIn 0.15s ease-out;
+    }
+
+    @keyframes popoverFadeIn {
+      from { opacity: 0; transform: translateY(-6px); }
+      to { opacity: 1; transform: translateY(0); }
     }
 
     /* ─── METRIC CARDS GRID ─── */
@@ -260,6 +329,13 @@
       backdrop-filter: blur(12px);
       position: relative;
       overflow: hidden;
+      cursor: pointer;
+      transition: transform 0.15s ease, border-color 0.15s ease;
+    }
+
+    .metric-card:hover {
+      transform: translateY(-2px);
+      border-color: rgba(255, 255, 255, 0.18);
     }
 
     .metric-card.card-packages {
@@ -763,12 +839,76 @@
           <svg style="width:14px;height:14px;stroke:currentColor;fill:none;stroke-width:2;" viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
           <input type="text" id="global-search" placeholder="Search">
         </div>
-        <div class="avatar-btn">A</div>
+
+        <!-- User Avatar & Popover -->
+        <div class="topbar-dropdown-anchor">
+          <div class="avatar-btn" id="btn-avatar" title="User Profile">A</div>
+          <div class="dropdown-popover" id="user-popover">
+            <div style="display:flex;align-items:center;gap:12px;margin-bottom:14px;padding-bottom:12px;border-bottom:1px solid rgba(255,255,255,0.08);">
+              <div class="avatar-btn" id="popover-avatar-icon" style="width:40px;height:40px;font-size:16px;flex-shrink:0;">A</div>
+              <div style="overflow:hidden;">
+                <div id="popover-user-name" style="font-weight:600;font-size:14px;color:#ffffff;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">user</div>
+                <div id="popover-user-privilege" style="font-size:11px;color:var(--accent-green);display:inline-flex;align-items:center;gap:4px;margin-top:2px;">
+                  <span style="width:6px;height:6px;border-radius:50%;background:currentColor;display:inline-block;"></span>
+                  Standard User
+                </div>
+              </div>
+            </div>
+            <div style="display:flex;flex-direction:column;gap:8px;font-size:12px;color:var(--text-muted);margin-bottom:14px;">
+              <div style="display:flex;justify-content:space-between;gap:8px;">
+                <span>Distribution:</span>
+                <span id="popover-distro" style="color:#ffffff;font-weight:500;text-align:right;">Linux</span>
+              </div>
+              <div style="display:flex;justify-content:space-between;gap:8px;">
+                <span>Architecture:</span>
+                <span id="popover-arch" style="color:#ffffff;font-weight:500;">x86_64</span>
+              </div>
+              <div style="display:flex;justify-content:space-between;gap:8px;">
+                <span>ULUM Version:</span>
+                <span id="popover-version" style="color:#ffffff;font-weight:500;">0.2.2</span>
+              </div>
+              <div style="display:flex;justify-content:space-between;gap:8px;">
+                <span>Database:</span>
+                <span id="popover-db" style="color:var(--text-dim);font-size:11px;word-break:break-all;text-align:right;">ulum.db</span>
+              </div>
+            </div>
+            <div style="display:flex;gap:8px;padding-top:8px;border-top:1px solid rgba(255,255,255,0.08);">
+              <button class="btn-action-dark" id="btn-popover-diag" style="flex:1;padding:6px 10px;font-size:12px;display:flex;align-items:center;justify-content:center;">Diagnostics</button>
+              <button class="btn-action-dark" id="btn-popover-settings" style="flex:1;padding:6px 10px;font-size:12px;display:flex;align-items:center;justify-content:center;">Settings</button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Refresh Inventory & Updates Button -->
         <div class="icon-btn" id="btn-refresh-all" title="Refresh Inventory & Updates">
           <svg style="width:16px;height:16px;stroke:currentColor;fill:none;stroke-width:2;" viewBox="0 0 24 24"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg>
         </div>
-        <div class="icon-btn" title="Notifications">
-          <svg style="width:16px;height:16px;stroke:currentColor;fill:none;stroke-width:2;" viewBox="0 0 24 24"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
+
+        <!-- Notifications Bell & Dropdown -->
+        <div class="topbar-dropdown-anchor">
+          <div class="icon-btn" id="btn-notifications" title="Notifications">
+            <svg style="width:16px;height:16px;stroke:currentColor;fill:none;stroke-width:2;" viewBox="0 0 24 24"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
+            <span class="notification-badge" id="notif-badge">0</span>
+          </div>
+          <div class="dropdown-popover" id="notif-popover" style="width:330px;">
+            <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;padding-bottom:10px;border-bottom:1px solid rgba(255,255,255,0.08);">
+              <div style="font-weight:600;font-size:14px;color:#ffffff;display:flex;align-items:center;gap:6px;">
+                <svg style="width:15px;height:15px;stroke:var(--accent-yellow);fill:none;stroke-width:2;" viewBox="0 0 24 24"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
+                Notifications
+              </div>
+              <span class="mini-pill" id="popover-notif-pill" style="font-size:10px;padding:2px 8px;">0 Pending</span>
+            </div>
+            <div id="popover-notif-list" style="display:flex;flex-direction:column;gap:10px;margin-bottom:12px;max-height:220px;overflow-y:auto;">
+              <!-- Populated by JS -->
+            </div>
+            <div style="display:flex;gap:8px;padding-top:8px;border-top:1px solid rgba(255,255,255,0.08);">
+              <button class="btn-action-dark" id="btn-popover-check-now" style="flex:1;padding:6px 10px;font-size:12px;display:flex;align-items:center;justify-content:center;gap:6px;">
+                <svg style="width:13px;height:13px;stroke:currentColor;fill:none;stroke-width:2;" viewBox="0 0 24 24"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg>
+                Check Now
+              </button>
+              <button class="btn-update-all" id="btn-popover-view-updates" style="flex:1;padding:6px 10px;font-size:12px;display:flex;align-items:center;justify-content:center;">View Updates</button>
+            </div>
+          </div>
         </div>
       </div>
     </header>
@@ -980,26 +1120,137 @@
       try {
         const res = await fetch('/api/stats');
         const data = await res.json();
-        document.getElementById('distro-label').innerText = `${data.distro_name} ${data.distro_version}`;
-        document.getElementById('stat-installed').innerText = data.installed_count || 185;
-        document.getElementById('stat-updates').innerText = data.updates_count;
-        document.getElementById('stat-leftovers').innerText = data.leftovers_size || '420 MB';
 
-        const apt = data.updates_by_source.apt || 0;
-        const flt = data.updates_by_source.flatpak || 0;
-        const snp = data.updates_by_source.snap || 0;
+        // Brand version & System Distro
+        if (data.version) {
+          const brandVer = document.getElementById('brand-version');
+          if (brandVer) brandVer.innerText = `v${data.version}`;
+        }
+        document.getElementById('distro-label').innerText = `${data.distro_name} ${data.distro_version}`;
+        document.getElementById('stat-installed').innerText = data.installed_count || 0;
+        document.getElementById('stat-updates').innerText = data.updates_count || 0;
+        document.getElementById('stat-leftovers').innerText = data.leftovers_size || '0 B';
+
+        // Avatar Profile
+        const user = data.user || 'User';
+        const initial = user.charAt(0).toUpperCase() || 'U';
+        const btnAvatar = document.getElementById('btn-avatar');
+        if (btnAvatar) {
+          btnAvatar.innerText = initial;
+          btnAvatar.setAttribute('title', `Logged in as ${user}`);
+        }
+        const popAvatar = document.getElementById('popover-avatar-icon');
+        if (popAvatar) popAvatar.innerText = initial;
+        const popUser = document.getElementById('popover-user-name');
+        if (popUser) popUser.innerText = user;
+        const popPriv = document.getElementById('popover-user-privilege');
+        if (popPriv) {
+          if (data.is_root) {
+            popPriv.style.color = '#ef4444';
+            popPriv.innerHTML = '<span style="width:6px;height:6px;border-radius:50%;background:#ef4444;display:inline-block;"></span> Root Administrator';
+          } else {
+            popPriv.style.color = 'var(--accent-green)';
+            popPriv.innerHTML = '<span style="width:6px;height:6px;border-radius:50%;background:var(--accent-green);display:inline-block;"></span> Standard User';
+          }
+        }
+        const popDistro = document.getElementById('popover-distro');
+        if (popDistro) popDistro.innerText = `${data.distro_name || 'Linux'} ${data.distro_version || ''}`;
+        const popArch = document.getElementById('popover-arch');
+        if (popArch) popArch.innerText = data.arch || '';
+        const popVer = document.getElementById('popover-version');
+        if (popVer) popVer.innerText = data.version || '0.2.2';
+        const popDb = document.getElementById('popover-db');
+        if (popDb) popDb.innerText = data.db_path || 'ulum.db';
+
+        // Notification Bell Badge & Dropdown Content
+        const count = Number(data.updates_count) || 0;
+        const badge = document.getElementById('notif-badge');
+        if (badge) {
+          if (count > 0) {
+            badge.innerText = count > 99 ? '99+' : count;
+            badge.style.display = 'flex';
+          } else {
+            badge.style.display = 'none';
+          }
+        }
+        const notifPill = document.getElementById('popover-notif-pill');
+        if (notifPill) {
+          notifPill.innerText = count > 0 ? `${count} Pending` : 'All Clear';
+          notifPill.className = count > 0 ? 'mini-pill snap' : 'mini-pill apt';
+        }
+        renderNotificationList(data);
+
+        const apt = data.updates_by_source?.apt || 0;
+        const flt = data.updates_by_source?.flatpak || 0;
+        const snp = data.updates_by_source?.snap || 0;
 
         document.getElementById('badge-apt').innerText = `APT: ${apt}`;
         document.getElementById('badge-flatpak').innerText = `Flatpak: ${flt}`;
         document.getElementById('badge-snap').innerText = `Snap: ${snp}`;
 
-        document.getElementById('btn-upd-count').innerText = data.updates_count;
-        document.getElementById('pill-all-count').innerText = data.updates_count;
+        document.getElementById('btn-upd-count').innerText = count;
+        document.getElementById('pill-all-count').innerText = count;
         document.getElementById('pill-apt-count').innerText = apt;
         document.getElementById('pill-flatpak-count').innerText = flt;
         document.getElementById('pill-snap-count').innerText = snp;
       } catch (err) {
         console.error('Failed loading stats:', err);
+      }
+    }
+
+    function renderNotificationList(data) {
+      const list = document.getElementById('popover-notif-list');
+      if (!list) return;
+      list.innerHTML = '';
+      const count = Number(data.updates_count) || 0;
+
+      if (count > 0) {
+        const item1 = document.createElement('div');
+        item1.style.cssText = 'background:rgba(255,255,255,0.04);border:1px solid var(--card-border);border-radius:8px;padding:10px;cursor:pointer;';
+        item1.innerHTML = `
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px;">
+            <span style="font-weight:600;font-size:12px;color:var(--accent-yellow);">Updates Available</span>
+            <span style="font-size:10px;color:var(--text-dim);">${new Date().toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'})}</span>
+          </div>
+          <p style="font-size:11px;color:var(--text-muted);margin:0;line-height:1.4;">${count} package update${count === 1 ? '' : 's'} ready to install.</p>
+        `;
+        item1.onclick = () => {
+          closeAllPopovers();
+          switchTab('updates');
+        };
+        list.appendChild(item1);
+
+        const item2 = document.createElement('div');
+        item2.style.cssText = 'background:rgba(255,255,255,0.03);border:1px solid var(--card-border);border-radius:8px;padding:10px;';
+        const apt = data.updates_by_source?.apt || 0;
+        const flt = data.updates_by_source?.flatpak || 0;
+        const snp = data.updates_by_source?.snap || 0;
+        item2.innerHTML = `
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px;">
+            <span style="font-weight:600;font-size:12px;color:var(--accent-green);">Package Sources</span>
+          </div>
+          <p style="font-size:11px;color:var(--text-muted);margin:0;line-height:1.4;">APT: ${escapeHtml(apt)} • Flatpak: ${escapeHtml(flt)} • Snap: ${escapeHtml(snp)}</p>
+        `;
+        list.appendChild(item2);
+      } else {
+        const itemEmpty = document.createElement('div');
+        itemEmpty.style.cssText = 'background:rgba(255,255,255,0.03);border:1px solid var(--card-border);border-radius:8px;padding:12px;text-align:center;';
+        itemEmpty.innerHTML = `
+          <div style="font-size:18px;margin-bottom:4px;">✨</div>
+          <div style="font-weight:600;font-size:12px;color:var(--accent-green);margin-bottom:2px;">All Systems Current</div>
+          <p style="font-size:11px;color:var(--text-muted);margin:0;">No package updates pending at this time.</p>
+        `;
+        list.appendChild(itemEmpty);
+
+        const itemTimer = document.createElement('div');
+        itemTimer.style.cssText = 'background:rgba(255,255,255,0.03);border:1px solid var(--card-border);border-radius:8px;padding:10px;';
+        itemTimer.innerHTML = `
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px;">
+            <span style="font-weight:600;font-size:12px;color:var(--accent-blue);">Scheduled Scans</span>
+          </div>
+          <p style="font-size:11px;color:var(--text-muted);margin:0;line-height:1.4;">Automated background checks run periodically via systemd timer.</p>
+        `;
+        list.appendChild(itemTimer);
       }
     }
 
@@ -1434,6 +1685,11 @@
     });
 
     // Navigation switching
+    function switchTab(tab) {
+      const item = document.querySelector(`.nav-item[data-tab="${tab}"]`);
+      if (item) item.click();
+    }
+
     document.querySelectorAll('.nav-item').forEach(item => {
       item.addEventListener('click', () => {
         document.querySelectorAll('.nav-item').forEach(i => i.classList.remove('active'));
@@ -1458,6 +1714,86 @@
         renderTable();
       });
     });
+
+    // Popover toggle and outside click handlers
+    function closeAllPopovers() {
+      document.querySelectorAll('.dropdown-popover').forEach(p => p.classList.remove('show'));
+    }
+
+    const btnAvatar = document.getElementById('btn-avatar');
+    const userPopover = document.getElementById('user-popover');
+    if (btnAvatar && userPopover) {
+      btnAvatar.addEventListener('click', (e) => {
+        e.stopPropagation();
+        const isOpen = userPopover.classList.contains('show');
+        closeAllPopovers();
+        if (!isOpen) {
+          userPopover.classList.add('show');
+        }
+      });
+    }
+
+    const btnNotif = document.getElementById('btn-notifications');
+    const notifPopover = document.getElementById('notif-popover');
+    if (btnNotif && notifPopover) {
+      btnNotif.addEventListener('click', (e) => {
+        e.stopPropagation();
+        const isOpen = notifPopover.classList.contains('show');
+        closeAllPopovers();
+        if (!isOpen) {
+          notifPopover.classList.add('show');
+        }
+      });
+    }
+
+    userPopover?.addEventListener('click', (e) => e.stopPropagation());
+    notifPopover?.addEventListener('click', (e) => e.stopPropagation());
+
+    document.addEventListener('click', () => {
+      closeAllPopovers();
+    });
+
+    // Popover Action Buttons
+    document.getElementById('btn-popover-diag')?.addEventListener('click', () => {
+      closeAllPopovers();
+      switchTab('diagnostics');
+    });
+
+    document.getElementById('btn-popover-settings')?.addEventListener('click', () => {
+      closeAllPopovers();
+      switchTab('settings');
+    });
+
+    document.getElementById('btn-popover-view-updates')?.addEventListener('click', () => {
+      closeAllPopovers();
+      switchTab('updates');
+    });
+
+    document.getElementById('btn-popover-check-now')?.addEventListener('click', async () => {
+      const btn = document.getElementById('btn-popover-check-now');
+      const origHtml = btn.innerHTML;
+      btn.innerHTML = `<span style="display:inline-block;width:12px;height:12px;border:2px solid rgba(255,255,255,0.3);border-top-color:#fff;border-radius:50%;animation:spin 0.8s linear infinite;"></span> Checking...`;
+      btn.disabled = true;
+      try {
+        await fetch('/api/check_updates', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ refresh: true })
+        });
+        await loadStats();
+        await loadData();
+      } catch (err) {
+        console.error('Check updates failed:', err);
+      } finally {
+        btn.innerHTML = origHtml;
+        btn.disabled = false;
+      }
+    });
+
+    // Metric cards interactive navigation
+    document.querySelector('.metric-card.card-updates')?.addEventListener('click', () => switchTab('updates'));
+    document.querySelector('.metric-card.card-packages')?.addEventListener('click', () => switchTab('installed'));
+    document.querySelector('.metric-card.card-leftovers')?.addEventListener('click', () => switchTab('leftovers'));
 
     // Source Filter Pills
     document.querySelectorAll('.filter-pill').forEach(pill => {
