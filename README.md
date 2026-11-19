@@ -7,6 +7,7 @@
 [![Package Managers](https://img.shields.io/badge/sources-APT%20%7C%20Flatpak%20%7C%20Snap-success.svg?style=flat-square)](https://github.com/Akai-Abd/ulum)
 [![GUI](https://img.shields.io/badge/GUI-GTK3%20%2B%20WebKit2%20Dashboard-purple.svg?style=flat-square)](https://github.com/Akai-Abd/ulum)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg?style=flat-square)](LICENSE)
+[![Built by](https://img.shields.io/badge/Built%20by-Abdurrahman-7c3aed.svg?style=flat-square&logo=github)](https://github.com/Akai-Abd)
 
 **An intelligent, multi-source package manager and safe uninstaller for Linux.**  
 Seamlessly orchestrate software updates and clean removals across **APT**, **Flatpak**, and **Snap** from a unified CLI and modern glassmorphic desktop GUI.
@@ -172,8 +173,12 @@ tests/unit/test_system_and_config.py ..
 
 ---
 
+## 👨‍💻 Author
+
+Designed and built by **[Abdurrahman](https://github.com/Akai-Abd)**.
+
+---
+
 ## 📄 License
 
 Distributed under the [MIT License](LICENSE). Built with Python, Typer, Rich, GTK3, and WebKit2.
-
-  **Build by Abdurrahman**
