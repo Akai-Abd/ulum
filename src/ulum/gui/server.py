@@ -140,6 +140,19 @@ class UlumApiHandler(http.server.BaseHTTPRequestHandler):
             })
             return
 
+        if path == "/api/settings":
+            from ulum.core.config import get_config_dir
+            from ulum.db.database import get_db_path
+            self.send_json({
+                "enabled_adapters": self.config.enabled_adapters,
+                "excluded_packages": self.config.excluded_packages,
+                "require_confirmation": self.config.require_confirmation,
+                "log_level": self.config.log_level,
+                "config_path": str(get_config_dir() / "config.toml"),
+                "db_path": str(get_db_path()),
+            })
+            return
+
         self.send_error(404, "Endpoint not found")
 
     def do_POST(self) -> None:
@@ -235,6 +248,26 @@ class UlumApiHandler(http.server.BaseHTTPRequestHandler):
                     except Exception:
                         pass
             self.send_json({"success": True, "deleted": deleted})
+            return
+
+        if path == "/api/settings":
+            from ulum.core.config import UlumConfig, save_config
+            enabled = payload.get("enabled_adapters", ["apt", "flatpak", "snap"])
+            excluded = payload.get("excluded_packages", [])
+            req_confirm = bool(payload.get("require_confirmation", True))
+            log_lvl = payload.get("log_level", "INFO")
+            new_cfg = UlumConfig(
+                enabled_adapters=enabled,
+                excluded_packages=excluded,
+                require_confirmation=req_confirm,
+                log_level=log_lvl,
+            )
+            save_config(new_cfg)
+            self.config.enabled_adapters = enabled
+            self.config.excluded_packages = excluded
+            self.config.require_confirmation = req_confirm
+            self.config.log_level = log_lvl
+            self.send_json({"success": True})
             return
 
         self.send_error(404, "Endpoint not found")

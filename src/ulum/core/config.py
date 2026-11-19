@@ -32,3 +32,17 @@ def load_config(config_path: Path | None = None) -> UlumConfig:
         )
     except Exception:
         return UlumConfig()
+
+def save_config(config: UlumConfig, config_path: Path | None = None) -> None:
+    path = config_path or (get_config_dir() / "config.toml")
+    path.parent.mkdir(parents=True, exist_ok=True)
+    adapters_str = ", ".join(f'"{a}"' for a in config.enabled_adapters)
+    excluded_str = ", ".join(f'"{p}"' for p in config.excluded_packages)
+    content = f"""# ULUM Configuration
+enabled_adapters = [{adapters_str}]
+excluded_packages = [{excluded_str}]
+require_confirmation = {str(config.require_confirmation).lower()}
+log_level = "{config.log_level}"
+"""
+    with open(path, "w", encoding="utf-8") as f:
+        f.write(content)

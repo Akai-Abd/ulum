@@ -37,4 +37,19 @@ def test_api_server_endpoints(temp_db):
       inv = json.loads(res.read().decode("utf-8"))
       assert isinstance(inv, list)
 
+    # 4. Test GET & POST /api/settings
+    with urllib.request.urlopen(f"{base_url}/api/settings") as res:
+      assert res.status == 200
+      cfg = json.loads(res.read().decode("utf-8"))
+      assert "enabled_adapters" in cfg
+
+    req = urllib.request.Request(
+        f"{base_url}/api/settings",
+        data=json.dumps({"enabled_adapters": ["apt"], "require_confirmation": True}).encode("utf-8"),
+        headers={"Content-Type": "application/json"},
+    )
+    with urllib.request.urlopen(req) as res:
+      assert res.status == 200
+      assert json.loads(res.read().decode("utf-8"))["success"] is True
+
     server.shutdown()
