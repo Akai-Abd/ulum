@@ -7,6 +7,46 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [0.2.0] - 2026-11-20
+
+### 🚀 Enhancements & New Capabilities
+
+- **AppImage & Standalone Binary Tracking**:
+  - Added dedicated `AppImageAdapter` scanning `~/Applications`, `~/.local/bin`, and custom `.desktop` files in `~/.local/share/applications/`.
+  - Supports tracking version, binary paths, desktop integration, and clean uninstallation (unlinking binary and removing desktop launcher).
+  - Integrated into core orchestrator and enabled by default in configuration.
+
+- **Pre-Update System Snapshots (Timeshift & Snapper)**:
+  - Added system restore snapshot hooks prior to applying system updates.
+  - Automatically detects Timeshift (`timeshift --create`) or Snapper (`snapper create`) with non-interactive root escalation.
+  - New `--snapshot` / `-S` flag for `ulum update` CLI command.
+  - Desktop GUI update confirmation modal now includes a toggle to create a pre-update snapshot.
+
+- **System Health Diagnostics & Automated Repair**:
+  - Enhanced `ulum doctor` with an automated repair routine (`ulum doctor --fix` / `-f`).
+  - Clears stale APT locks and fixes interrupted dpkg states (`dpkg --configure -a` and `apt-get install -f -y`).
+
+- **Automated Update Checks & Desktop Notifications**:
+  - New `ulum schedule` command managing systemd user services (`ulum-check.service` and `ulum-check.timer`).
+  - Periodically checks for updates in the background and delivers native desktop notifications via `notify-send`.
+  - Provides `--install`, `--uninstall`, and `--status` flags.
+
+- **Non-blocking Desktop GUI Concurrency**:
+  - Converted internal GUI HTTP server to `ThreadedTCPServer` with thread-safe tracking of current operations (`CURRENT_OPERATION`).
+  - Introduced `/api/progress` endpoint so long-running operations (such as system updates or snapshots) never block the UI thread.
+  - Added snapshot checkbox to desktop GUI update modal.
+
+- **Residual Scanner Refinement**:
+  - Expanded leftover directory discovery in `~/.config` and `~/.cache` to match dotless folder patterns.
+  - Added generic desktop folder protection list (`dconf`, `gtk-3.0`, `pulse`, `systemd`, `mime`, etc.) to prevent accidental removal of shared environment configurations.
+  - Guarded Flatpak and Snap removal item generation to prevent false data loss warnings during standard uninstalls.
+
+- **Native Debian Packaging & CI/CD**:
+  - Added `scripts/build_deb.sh` to package ULUM directly into standard Debian `.deb` packages with binary launchers and `.desktop` integration.
+  - Added GitHub Actions release workflow (`.github/workflows/release.yml`) for automated testing and `.deb` asset generation on tagged releases.
+
+---
+
 ## [0.1.0] - 2026-11-20
 
 ### 🌟 Initial Release Highlights

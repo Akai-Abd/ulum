@@ -79,3 +79,26 @@ def test_snap_adapter_list_installed(monkeypatch):
     assert len(apps) == 2
     assert apps[0].package_id == "core22"
     assert apps[1].package_id == "vlc"
+
+def test_appimage_adapter(tmp_path, monkeypatch):
+    from ulum.adapters.appimage import AppImageAdapter
+    adapter = AppImageAdapter()
+    app_dir = tmp_path / "Applications"
+    app_dir.mkdir()
+    fake_app = app_dir / "Cursor-0.45.1.AppImage"
+    fake_app.write_text("binary", encoding="utf-8")
+
+    monkeypatch.setattr(adapter, "_get_search_dirs", lambda: [app_dir])
+    monkeypatch.setattr("pathlib.Path.home", lambda: tmp_path)
+
+    apps = adapter.list_installed()
+    assert len(apps) == 1
+    assert apps[0].package_id == "cursor-0.45.1"
+    assert apps[0].installed_version == "0.45.1"
+
+    # Plan removal
+    plan = adapter.build_removal_plan(apps[0], complete=True)
+    assert plan.is_safe is True
+    res = adapter.execute_native_removal(plan)
+    assert res.success is True
+    assert not fake_app.exists()

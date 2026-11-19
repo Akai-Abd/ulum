@@ -48,4 +48,21 @@ def detect_package_managers() -> Dict[str, bool]:
         "apt": command_exists("apt-get") and command_exists("dpkg-query"),
         "flatpak": command_exists("flatpak"),
         "snap": command_exists("snap"),
+        "appimage": True,
     }
+
+def create_system_snapshot(comment: str = "Pre-ULUM update backup") -> tuple[bool, str]:
+    from ulum.utils.process import run_cmd
+    if command_exists("timeshift"):
+        try:
+            res = run_cmd(["timeshift", "--create", "--comments", comment, "--tags", "O"], require_root=True)
+            return (res.returncode == 0, res.stdout.strip() or res.stderr.strip())
+        except Exception as e:
+            return (False, str(e))
+    elif command_exists("snapper"):
+        try:
+            res = run_cmd(["snapper", "create", "-d", comment], require_root=True)
+            return (res.returncode == 0, res.stdout.strip() or res.stderr.strip())
+        except Exception as e:
+            return (False, str(e))
+    return (False, "Neither Timeshift nor Snapper was found on this system.")

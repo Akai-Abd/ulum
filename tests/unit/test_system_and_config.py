@@ -27,3 +27,10 @@ def test_config_loader(tmp_path):
     assert cfg.enabled_adapters == ["apt", "flatpak"]
     assert cfg.excluded_packages == ["apt:held-pkg"]
     assert cfg.require_confirmation is False
+
+def test_system_snapshot_fallback(monkeypatch):
+    from ulum.core.system import create_system_snapshot
+    monkeypatch.setattr("ulum.core.system.command_exists", lambda cmd: False)
+    ok, msg = create_system_snapshot()
+    assert ok is False
+    assert "Neither Timeshift nor Snapper" in msg

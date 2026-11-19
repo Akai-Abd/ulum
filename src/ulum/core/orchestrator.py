@@ -1,6 +1,7 @@
 import datetime
 from typing import Dict, List, Optional, Tuple
 from ulum.adapters.apt import AptAdapter
+from ulum.adapters.appimage import AppImageAdapter
 from ulum.adapters.base import BaseAdapter
 from ulum.adapters.flatpak import FlatpakAdapter
 from ulum.adapters.snap import SnapAdapter
@@ -24,6 +25,7 @@ class Orchestrator:
             "apt": AptAdapter(),
             "flatpak": FlatpakAdapter(),
             "snap": SnapAdapter(),
+            "appimage": AppImageAdapter(),
         }
 
     def get_available_adapters(self) -> Dict[str, BaseAdapter]:
@@ -69,7 +71,13 @@ class Orchestrator:
         targets: Optional[List[str]] = None,
         source: Optional[str] = None,
         dry_run: bool = False,
+        create_snapshot: bool = False,
     ) -> List[Tuple[str, ExecutionResult]]:
+        if create_snapshot and not dry_run:
+            from ulum.core.system import create_system_snapshot
+            ok, msg = create_system_snapshot("Pre-update backup via ULUM")
+            logger.info("System snapshot status: %s (%s)", "Created" if ok else "Skipped/Failed", msg)
+
         results: List[Tuple[str, ExecutionResult]] = []
         active_adapters = self.get_available_adapters()
 

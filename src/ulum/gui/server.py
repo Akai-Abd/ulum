@@ -17,6 +17,12 @@ from ulum.utils.logging import logger
 
 WEB_DIR = Path(__file__).parent / "web"
 
+CURRENT_OPERATION: Dict[str, Any] = {
+    "running": False,
+    "task": "Idle",
+    "logs": [],
+}
+
 class UlumApiHandler(http.server.BaseHTTPRequestHandler):
     repo: Repository
     config: UlumConfig
@@ -152,6 +158,10 @@ class UlumApiHandler(http.server.BaseHTTPRequestHandler):
             })
             return
 
+        if path == "/api/progress":
+            self.send_json(CURRENT_OPERATION)
+            return
+
         self.send_error(404, "Endpoint not found")
 
     def do_POST(self) -> None:
@@ -180,10 +190,24 @@ class UlumApiHandler(http.server.BaseHTTPRequestHandler):
             identifier = payload.get("identifier")
             all_pkgs = payload.get("all", False)
             source = payload.get("source")
+            snapshot = bool(payload.get("snapshot", False))
             targets = [identifier] if identifier else None
-            results = self.orchestrator.execute_updates(targets=targets, source=source, dry_run=False)
-            success = all(r.success for _, r in results)
-            self.send_json({"success": success})
+
+            CURRENT_OPERATION["running"] = True
+            CURRENT_OPERATION["task"] = f"Updating {identifier or source or 'all software'}..."
+            CURRENT_OPERATION["logs"] = [f"Beginning updates for: {identifier or source or 'all software'}"]
+
+            try:
+                results = self.orchestrator.execute_updates(
+                    targets=targets, source=source, dry_run=False, create_snapshot=snapshot
+                )
+                success = all(r.success for _, r in results)
+                for src, res in results:
+                    status_text = "succeeded" if res.success else f"failed: {res.error_summary or res.stderr}"
+                    CURRENT_OPERATION["logs"].append(f"[{src.upper()}] {status_text}")
+                self.send_json({"success": success, "logs": CURRENT_OPERATION["logs"]})
+            finally:
+                CURRENT_OPERATION["running"] = False
             return
 
         if path == "/api/plan_removal":
@@ -278,6 +302,10 @@ class UlumApiHandler(http.server.BaseHTTPRequestHandler):
 
         self.send_error(404, "Endpoint not found")
 
+class ThreadedTCPServer(socketserver.ThreadingMixIn, socketserver.TCPServer):
+    allow_reuse_address = True
+    daemon_threads = True
+
 def create_server(repo: Repository, config: UlumConfig, orchestrator: Orchestrator, host: str = "127.0.0.1", port: int = 0) -> socketserver.TCPServer:
     class BoundHandler(UlumApiHandler):
         pass
@@ -286,7 +314,5 @@ def create_server(repo: Repository, config: UlumConfig, orchestrator: Orchestrat
     BoundHandler.config = config
     BoundHandler.orchestrator = orchestrator
 
-    # Re-use address to avoid lingering port bindings
-    socketserver.TCPServer.allow_reuse_address = True
-    server = socketserver.TCPServer((host, port), BoundHandler)
+    server = ThreadedTCPServer((host, port), BoundHandler)
     return server

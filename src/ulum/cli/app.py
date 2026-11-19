@@ -134,6 +134,7 @@ def update_cmd(
     all_packages: bool = typer.Option(False, "--all", "-a", help="Update all eligible packages across all sources"),
     source: Optional[str] = typer.Option(None, "--source", "-s", help="Update all packages for a specific source"),
     dry_run: bool = typer.Option(False, "--dry-run", "-n", help="Simulate update without modifying the system"),
+    snapshot: bool = typer.Option(False, "--snapshot", "-S", help="Create a Timeshift/Snapper system snapshot before updating"),
     yes: bool = typer.Option(False, "--yes", "-y", help="Skip interactive confirmation"),
 ):
     """Update a specific application, a single source, or all eligible software."""
@@ -154,7 +155,7 @@ def update_cmd(
             console.print("[dim]Update cancelled by user.[/dim]")
             raise typer.Exit(code=0)
 
-    results = orc.execute_updates(targets=targets, source=source, dry_run=dry_run)
+    results = orc.execute_updates(targets=targets, source=source, dry_run=dry_run, create_snapshot=snapshot)
     for src, res in results:
         if res.success:
             console.print(f"[bold green]✓ {src.upper()} update succeeded.[/bold green]")
@@ -292,7 +293,9 @@ def removal_history_cmd(limit: int = typer.Option(20, "--limit", "-l", help="Num
     print_history_table(hist, kind="removal")
 
 @app.command("doctor")
-def doctor_cmd():
+def doctor_cmd(
+    fix: bool = typer.Option(False, "--fix", "-f", help="Attempt automatic repair of interrupted dpkg/apt locks and state"),
+):
     """Diagnose system compatibility, package managers, and database health."""
     console.print("[bold cyan]Running ULUM Health Diagnostics...[/bold cyan]\n")
     info = get_system_info()
@@ -311,4 +314,73 @@ def doctor_cmd():
     from ulum.utils.process import command_exists, is_root
     sudo_ok = is_root() or command_exists("sudo")
     console.print(f"Privilege Escalation (sudo/root): {'[green]OK[/green]' if sudo_ok else '[red]Missing sudo[/red]'}")
+
+    if fix:
+        console.print("\n[bold yellow]Attempting automated package manager recovery...[/bold yellow]")
+        from ulum.utils.process import run_cmd
+        try:
+            console.print("  • Configuring pending packages (dpkg --configure -a)...")
+            run_cmd(["dpkg", "--configure", "-a"], require_root=True)
+            console.print("  • Resolving broken dependencies (apt-get install -f)...")
+            run_cmd(["apt-get", "install", "-f", "-y"], require_root=True)
+            console.print("[bold green]✓ Automated recovery tasks completed successfully.[/bold green]")
+        except Exception as e:
+            console.print(f"[bold red]Recovery encountered an error:[/bold red] {e}")
+
     console.print("\n[bold green]✓ Diagnostic check complete.[/bold green]")
+
+@app.command("schedule")
+def schedule_cmd(
+    install: bool = typer.Option(False, "--install", "-i", help="Install daily background update notification timer via systemd"),
+    uninstall: bool = typer.Option(False, "--uninstall", "-u", help="Remove background update notification timer"),
+    status: bool = typer.Option(False, "--status", "-s", help="Check status of background update timer"),
+):
+    """Manage automated background update checks and desktop notifications."""
+    import subprocess
+    systemd_user = Path.home() / ".config" / "systemd" / "user"
+    service_file = systemd_user / "ulum-check.service"
+    timer_file = systemd_user / "ulum-check.timer"
+
+    if uninstall:
+        if timer_file.exists():
+            subprocess.run(["systemctl", "--user", "disable", "--now", "ulum-check.timer"], capture_output=True)
+            timer_file.unlink(missing_ok=True)
+            service_file.unlink(missing_ok=True)
+            subprocess.run(["systemctl", "--user", "daemon-reload"], capture_output=True)
+            console.print("[bold green]✓ Background update check timer removed.[/bold green]")
+        else:
+            console.print("[dim]No active timer was found.[/dim]")
+        return
+
+    if status:
+        res = subprocess.run(["systemctl", "--user", "is-active", "ulum-check.timer"], capture_output=True, text=True)
+        is_active = res.stdout.strip() == "active"
+        console.print(f"Background Update Timer: {'[green]Active (Running)[/green]' if is_active else '[yellow]Inactive[/yellow]'}")
+        return
+
+    systemd_user.mkdir(parents=True, exist_ok=True)
+    ulum_bin = shutil.which("ulum") or f"{Path.home()}/.local/bin/ulum"
+    service_content = f"""[Unit]
+Description=ULUM Daily Background Update Checker
+After=network-online.target
+
+[Service]
+Type=oneshot
+ExecStart=/bin/bash -c '{ulum_bin} check && UPDATES=$({ulum_bin} list -u | grep -E "apt|flatpak|snap" | wc -l); if [ "$UPDATES" -gt 0 ]; then notify-send "ULUM Updates Available" "$UPDATES updates are ready for installation." --icon=software-update-available; fi'
+"""
+    timer_content = """[Unit]
+Description=Run ULUM background check daily
+
+[Timer]
+OnCalendar=daily
+Persistent=true
+
+[Install]
+WantedBy=timers.target
+"""
+    service_file.write_text(service_content, encoding="utf-8")
+    timer_file.write_text(timer_content, encoding="utf-8")
+    subprocess.run(["systemctl", "--user", "daemon-reload"], capture_output=True)
+    subprocess.run(["systemctl", "--user", "enable", "--now", "ulum-check.timer"], capture_output=True)
+    console.print("[bold green]✓ Background update notification timer installed and activated.[/bold green]")
+    console.print("ULUM will silently check daily and display a desktop notification when updates arrive.")

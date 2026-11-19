@@ -100,16 +100,17 @@ class FlatpakAdapter(BaseAdapter):
         native_cmd.append(target.package_id)
 
         cleanup_items: List[CleanupCandidate] = []
-        var_app_dir = Path.home() / ".var" / "app" / target.package_id
-        if var_app_dir.exists():
-            cleanup_items.append(
-                CleanupCandidate(
-                    path=var_app_dir,
-                    candidate_type="data",
-                    evidence=f"Flatpak sandbox data directory matches application ID '{target.package_id}'",
-                    confidence=ConfidenceLevel.VERIFIED,
+        if complete:
+            var_app_dir = Path.home() / ".var" / "app" / target.package_id
+            if var_app_dir.exists():
+                cleanup_items.append(
+                    CleanupCandidate(
+                        path=var_app_dir,
+                        candidate_type="data",
+                        evidence=f"Flatpak sandbox data directory matches application ID '{target.package_id}'",
+                        confidence=ConfidenceLevel.VERIFIED,
+                    )
                 )
-            )
 
         return RemovalPlan(
             application=target,

@@ -1,0 +1,10 @@
+[Desktop Entry]
+Name=Universal Linux Update Manager
+GenericName=Update Manager
+Comment=Orchestrate updates and safe removals across APT, Flatpak, and Snap
+Exec=ulum gui
+Icon=system-software-update
+Terminal=false
+Type=Application
+Categories=System;Settings;PackageManager;
+Keywords=update;package;apt;flatpak;snap;cleanup;

@@ -7,6 +7,7 @@ class SourceType(str, Enum):
     APT = "apt"
     FLATPAK = "flatpak"
     SNAP = "snap"
+    APPIMAGE = "appimage"
 
 class ScopeType(str, Enum):
     SYSTEM = "system"

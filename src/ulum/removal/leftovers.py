@@ -63,12 +63,18 @@ class LeftoverScanner:
                         )
 
         # 3. Check ~/.config and ~/.cache
+        GENERIC_SYSTEM_DIRS = {
+            "dconf", "gtk-3.0", "gtk-4.0", "pulse", "systemd", "autostart",
+            "ibus", "fontconfig", "mimeapps.list", "user-dirs.dirs", "menus"
+        }
         for base, ctype in [(home / ".config", "config"), (home / ".cache", "cache")]:
             if base.exists():
                 for entry in base.iterdir():
-                    if entry.is_dir():
+                    if entry.is_dir() and not entry.name.startswith("."):
                         name_lower = entry.name.lower()
-                        if name_lower not in installed_pkg_ids and "." in entry.name:
+                        if name_lower in GENERIC_SYSTEM_DIRS:
+                            continue
+                        if name_lower not in installed_pkg_ids:
                             is_valid, _ = SafetyValidator.validate_cleanup_path(entry)
                             if is_valid:
                                 candidates.append(

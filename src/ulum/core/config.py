@@ -11,7 +11,7 @@ def get_config_dir() -> Path:
 
 @dataclass
 class UlumConfig:
-    enabled_adapters: List[str] = field(default_factory=lambda: ["apt", "flatpak", "snap"])
+    enabled_adapters: List[str] = field(default_factory=lambda: ["apt", "flatpak", "snap", "appimage"])
     excluded_packages: List[str] = field(default_factory=list)
     require_confirmation: bool = True
     log_level: str = "INFO"
@@ -25,7 +25,7 @@ def load_config(config_path: Path | None = None) -> UlumConfig:
         with open(path, "rb") as f:
             data = tomllib.load(f)
         return UlumConfig(
-            enabled_adapters=data.get("enabled_adapters", ["apt", "flatpak", "snap"]),
+            enabled_adapters=data.get("enabled_adapters", ["apt", "flatpak", "snap", "appimage"]),
             excluded_packages=data.get("excluded_packages", []),
             require_confirmation=data.get("require_confirmation", True),
             log_level=data.get("log_level", "INFO"),

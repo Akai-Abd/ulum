@@ -94,16 +94,17 @@ class SnapAdapter(BaseAdapter):
         cmd.append(target.package_id)
 
         cleanup_items: List[CleanupCandidate] = []
-        snap_user_dir = Path.home() / "snap" / target.package_id
-        if snap_user_dir.exists():
-            cleanup_items.append(
-                CleanupCandidate(
-                    path=snap_user_dir,
-                    candidate_type="data",
-                    evidence=f"User snap directory matches snap package '{target.package_id}'",
-                    confidence=ConfidenceLevel.VERIFIED,
+        if complete:
+            snap_user_dir = Path.home() / "snap" / target.package_id
+            if snap_user_dir.exists():
+                cleanup_items.append(
+                    CleanupCandidate(
+                        path=snap_user_dir,
+                        candidate_type="data",
+                        evidence=f"User snap directory matches snap package '{target.package_id}'",
+                        confidence=ConfidenceLevel.VERIFIED,
+                    )
                 )
-            )
 
         return RemovalPlan(
             application=target,
