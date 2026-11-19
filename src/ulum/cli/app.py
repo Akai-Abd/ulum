@@ -32,6 +32,12 @@ def get_orchestrator() -> Orchestrator:
     config = load_config()
     return Orchestrator(repo=repo, config=config)
 
+@app.command("gui")
+def gui_cmd():
+    """Launch the graphical user interface."""
+    from ulum.gui.window import run_gui
+    run_gui()
+
 @app.command("version")
 def version_cmd():
     """Show ULUM version and host environment."""

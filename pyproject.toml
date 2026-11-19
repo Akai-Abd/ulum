@@ -15,6 +15,7 @@ dependencies = [
 
 [project.scripts]
 ulum = "ulum.main:cli_entrypoint"
+ulum-gui = "ulum.gui.window:run_gui"
 
 [tool.flit.module]
 name = "ulum"
