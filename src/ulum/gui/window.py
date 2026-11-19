@@ -1,6 +1,12 @@
+import os
 import shutil
 import threading
 from typing import Callable, Optional
+
+# Disable DRM/GBM buffer allocation to prevent NVIDIA/X11 driver crashes
+os.environ.setdefault("WEBKIT_DISABLE_DMABUF_RENDERER", "1")
+os.environ.setdefault("WEBKIT_DISABLE_COMPOSITING_MODE", "1")
+
 import gi
 gi.require_version("Gtk", "3.0")
 from gi.repository import GLib, Gtk
@@ -505,6 +511,8 @@ class WebDashboardWindow(Gtk.Window):
         gi.require_version("WebKit2", "4.1")
         from gi.repository import WebKit2
         self.webview = WebKit2.WebView()
+        settings = self.webview.get_settings()
+        settings.set_hardware_acceleration_policy(WebKit2.HardwareAccelerationPolicy.NEVER)
         self.webview.load_uri(f"http://127.0.0.1:{port}/")
         self.add(self.webview)
 
