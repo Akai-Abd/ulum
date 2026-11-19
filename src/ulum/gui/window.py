@@ -62,16 +62,21 @@ class MainWindow(Gtk.Window):
         self.spinner.start()
         self.set_sensitive(False)
 
+        def dispatch(callback, *args):
+            callback(*args)
+            return False
+
         def worker():
             try:
                 res = task_func()
                 if on_complete:
-                    GLib.idle_add(lambda: on_complete(res, None))
+                    GLib.idle_add(dispatch, on_complete, res, None)
             except Exception as e:
+                err = e
                 if on_complete:
-                    GLib.idle_add(lambda: on_complete(None, e))
+                    GLib.idle_add(dispatch, on_complete, None, err)
             finally:
-                GLib.idle_add(self._task_finished)
+                GLib.idle_add(dispatch, self._task_finished)
 
         t = threading.Thread(target=worker, daemon=True)
         t.start()

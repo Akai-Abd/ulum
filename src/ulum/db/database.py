@@ -19,7 +19,7 @@ def get_db_path() -> Path:
 
 def init_db(db_path: Path | str | None = None) -> sqlite3.Connection:
     target = db_path if db_path is not None else get_db_path()
-    conn = sqlite3.connect(str(target))
+    conn = sqlite3.connect(str(target), check_same_thread=False)
     conn.row_factory = sqlite3.Row
     conn.execute("PRAGMA journal_mode=WAL")
     conn.execute("PRAGMA foreign_keys=ON")
