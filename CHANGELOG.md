@@ -7,6 +7,35 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [0.2.2] - 2026-11-20
+
+### 🛡️ Production Hardening & Full Audit Remediation
+
+- **🔒 Security & Remote Access Hardening**:
+  - Eliminated remote cross-origin access and CSRF attack vectors on the local GUI server by removing the CORS wildcard (`*`), rejecting non-local Origin headers with HTTP 403, and requiring session authentication tokens (`X-ULUM-Token`) on all mutating endpoints.
+  - Remediated stored Cross-Site Scripting (XSS) in the WebKit dashboard by replacing raw HTML string interpolations and inline `onclick` attributes with secure DOM element creation and event listeners.
+
+- **🐞 Core Reliability & Safety**:
+  - Fixed silent uninstallation failure on AppImages lacking cached locations by dynamically updating the application record with the resolved binary path and reading fallback targets from native commands.
+  - Fixed case-sensitivity mismatch in `RemovalPlanner` to correctly identify critical system directory warnings and flag dangerous removal plans as unsafe.
+  - Ensured thread-safe SQLite operations by protecting all repository queries and transactions with a re-entrant lock (`threading.RLock`), preventing cursor collisions across multi-threaded web server requests.
+  - Hardened automated APT updates with non-interactive flags (`DEBIAN_FRONTEND=noninteractive`, `--force-confdef`, `--force-confold`) to prevent indefinite hangs on configuration-file conflict prompts.
+  - Corrected APT reverse-dependency analysis to flag package removals as unsafe whenever installed packages depend on the target.
+  - Added snapshot pre-check failure gating so update operations abort safely if requested Timeshift or Snapper restore points fail to create.
+
+- **🧹 Residual Scanner Precision & Atomic Persistence**:
+  - Refined leftover scanner prefix matching with strict word boundary delimiters (`-`, `_`), preventing installed utilities (e.g., `git`, `ed`, `code`) from falsely suppressing uninstalled application cleanup detection.
+  - Implemented atomic crash-safe file writes with temporary files and `fsync` for `config.toml` persistence.
+  - Synchronized pending updates state upon successful upgrades, immediately clearing installed packages from the pending queue.
+  - Replaced row-by-row insertion loops in `save_updates` and `save_cleanup_candidates` with high-throughput batch `executemany` operations.
+  - Deduplicated directory size calculations during removal planning.
+
+- **🖥️ Desktop & CLI Usability**:
+  - Added AppImage support to the native GTK fallback window's source filter.
+  - Added platform guards to `ulum doctor --fix` to verify Debian/APT binary availability before attempting recovery.
+
+---
+
 ## [0.2.1] - 2026-11-20
 
 ### 🛡️ Quality Audit & Performance Fixes
