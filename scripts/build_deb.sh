@@ -13,6 +13,8 @@ mkdir -p "$PKG_DIR/DEBIAN"
 mkdir -p "$PKG_DIR/usr/lib/python3/dist-packages/ulum"
 mkdir -p "$PKG_DIR/usr/bin"
 mkdir -p "$PKG_DIR/usr/share/applications"
+mkdir -p "$PKG_DIR/usr/share/icons/hicolor/scalable/apps"
+mkdir -p "$PKG_DIR/usr/share/pixmaps"
 
 # Control file
 cat << EOF > "$PKG_DIR/DEBIAN/control"
@@ -46,8 +48,10 @@ exec /usr/bin/python3 -c "from ulum.gui.window import run_gui; run_gui()" "$@"
 EOF
 chmod +x "$PKG_DIR/usr/bin/ulum-gui"
 
-# Desktop launcher
+# Desktop launcher and icon
 cp "$DIR/assets/ulum.desktop" "$PKG_DIR/usr/share/applications/ulum.desktop"
+cp "$DIR/assets/ulum.svg" "$PKG_DIR/usr/share/icons/hicolor/scalable/apps/ulum.svg"
+cp "$DIR/assets/ulum.svg" "$PKG_DIR/usr/share/pixmaps/ulum.svg"
 
 # Build package
 dpkg-deb --build --root-owner-group "$PKG_DIR" "$DIR/dist/ulum_${VERSION}_${ARCH}.deb"

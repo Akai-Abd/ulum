@@ -527,7 +527,21 @@ class WebDashboardWindow(Gtk.Window):
             threading.Thread(target=self.server.shutdown, daemon=True).start()
         Gtk.main_quit()
 
+def _setup_app_icon():
+    try:
+        icon_path = Path(__file__).resolve().parent.parent.parent.parent / "assets" / "ulum.svg"
+        if icon_path.exists():
+            Gtk.Window.set_default_icon_from_file(str(icon_path))
+        else:
+            Gtk.Window.set_default_icon_name("ulum")
+    except Exception:
+        try:
+            Gtk.Window.set_default_icon_name("ulum")
+        except Exception:
+            pass
+
 def run_gui():
+    _setup_app_icon()
     try:
         gi.require_version("WebKit2", "4.1")
         from gi.repository import WebKit2
