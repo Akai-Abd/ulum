@@ -352,10 +352,12 @@ def schedule_cmd(
             console.print("[dim]No active timer was found.[/dim]")
         return
 
-    if status:
+    if not install or status:
         res = subprocess.run(["systemctl", "--user", "is-active", "ulum-check.timer"], capture_output=True, text=True)
         is_active = res.stdout.strip() == "active"
         console.print(f"Background Update Timer: {'[green]Active (Running)[/green]' if is_active else '[yellow]Inactive[/yellow]'}")
+        if not is_active:
+            console.print("[dim]Run 'ulum schedule --install' to enable daily background update checks.[/dim]")
         return
 
     systemd_user.mkdir(parents=True, exist_ok=True)

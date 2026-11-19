@@ -52,12 +52,14 @@ class SafetyValidator:
         target = Path(path).expanduser()
         
         # Check system blacklist
-        for sys_dir in SYSTEM_BLACKLIST:
-            try:
-                if target.resolve() == sys_dir.resolve():
-                    return False, f"Path '{target}' is a critical system directory."
-            except Exception:
-                pass
+        try:
+            target_res = target.resolve()
+            for sys_dir in SYSTEM_BLACKLIST:
+                sys_res = sys_dir.resolve()
+                if target_res == sys_res or (sys_res != Path("/") and sys_res in target_res.parents):
+                    return False, f"Path '{target}' is a critical system directory or parent."
+        except Exception:
+            pass
 
         # Check protected user directories
         for user_dir in get_protected_user_paths():

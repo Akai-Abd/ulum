@@ -17,18 +17,22 @@ class Repository:
     def save_applications(self, apps: List[ApplicationRecord], prune_source: Optional[str] = None) -> None:
         now = datetime.datetime.now(datetime.timezone.utc).isoformat()
         with self.conn:
-            if prune_source:
-                current_ids = [a.package_id for a in apps]
-                if current_ids:
-                    placeholders = ",".join("?" for _ in current_ids)
-                    self.conn.execute(
-                        f"DELETE FROM applications WHERE source = ? AND package_id NOT IN ({placeholders})",
-                        [prune_source] + current_ids,
+            if apps:
+                rows = [
+                    (
+                        app.source.value,
+                        app.source_scope.value,
+                        app.package_id,
+                        app.display_name,
+                        app.installed_version,
+                        app.install_location,
+                        1 if app.update_supported else 0,
+                        1 if app.remove_supported else 0,
+                        now,
                     )
-                else:
-                    self.conn.execute("DELETE FROM applications WHERE source = ?", (prune_source,))
-            for app in apps:
-                self.conn.execute(
+                    for app in apps
+                ]
+                self.conn.executemany(
                     """
                     INSERT INTO applications (
                         source, source_scope, package_id, display_name,
@@ -41,17 +45,12 @@ class Repository:
                         install_location = excluded.install_location,
                         last_scanned_at = excluded.last_scanned_at
                     """,
-                    (
-                        app.source.value,
-                        app.source_scope.value,
-                        app.package_id,
-                        app.display_name,
-                        app.installed_version,
-                        app.install_location,
-                        1 if app.update_supported else 0,
-                        1 if app.remove_supported else 0,
-                        now,
-                    ),
+                    rows,
+                )
+            if prune_source:
+                self.conn.execute(
+                    "DELETE FROM applications WHERE source = ? AND last_scanned_at < ?",
+                    (prune_source, now),
                 )
 
     def delete_application(self, source: str, package_id: str) -> None:

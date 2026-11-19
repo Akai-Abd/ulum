@@ -37,7 +37,11 @@ class AppImageAdapter(BaseAdapter):
         # 1. Search directories for .AppImage files
         for sdir in self._get_search_dirs():
             if sdir.exists():
-                for f in sdir.iterdir():
+                try:
+                    entries = list(sdir.iterdir())
+                except (OSError, PermissionError):
+                    continue
+                for f in entries:
                     if f.is_file() and f.name.lower().endswith(".appimage"):
                         seen_paths.add(f.resolve())
                         pkg_id = f.stem.lower()
@@ -101,25 +105,36 @@ class AppImageAdapter(BaseAdapter):
 
     def build_removal_plan(self, target: ApplicationRecord, complete: bool = False) -> RemovalPlan:
         loc = target.install_location or ""
-        native_cmd = ["rm", "-f", loc]
+        if not loc:
+            for sdir in self._get_search_dirs():
+                if sdir.exists():
+                    for ext in (".AppImage", ".appimage"):
+                        cand = sdir / f"{target.package_id}{ext}"
+                        if cand.exists():
+                            loc = str(cand.resolve())
+                            break
+                if loc:
+                    break
+        native_cmd = ["rm", "-f", loc] if loc else ["true"]
         cleanup_items: List[CleanupCandidate] = []
 
         if complete:
-            # Check for corresponding desktop launcher
+            # Check for corresponding desktop launcher and config
             desktop_dir = Path.home() / ".local" / "share" / "applications"
             candidates = [
                 desktop_dir / f"{target.package_id}.desktop",
                 desktop_dir / f"appimagekit-{target.package_id}.desktop",
+                Path.home() / ".config" / target.package_id,
             ]
             for cpath in candidates:
                 if cpath.exists():
                     cleanup_items.append(
                         CleanupCandidate(
                             path=cpath,
-                            candidate_type="desktop_entry",
-                            evidence=f"Desktop launcher associated with {target.package_id}",
+                            candidate_type="desktop_entry" if cpath.suffix == ".desktop" else "config",
+                            evidence=f"Associated with AppImage {target.package_id}",
                             confidence=ConfidenceLevel.VERIFIED,
-                            estimated_size_bytes=cpath.stat().st_size,
+                            estimated_size_bytes=cpath.stat().st_size if cpath.is_file() else 0,
                         )
                     )
 

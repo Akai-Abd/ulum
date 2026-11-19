@@ -863,6 +863,10 @@
               <span>Snap (Canonical Snapd)</span>
               <input type="checkbox" id="cfg-snap" checked>
             </div>
+            <div class="settings-row">
+              <span>AppImage (Standalone Binaries)</span>
+              <input type="checkbox" id="cfg-appimage" checked>
+            </div>
           </div>
 
           <div class="settings-card">
@@ -1002,6 +1006,7 @@
         document.getElementById('cfg-apt').checked = adapters.includes('apt');
         document.getElementById('cfg-flatpak').checked = adapters.includes('flatpak');
         document.getElementById('cfg-snap').checked = adapters.includes('snap');
+        document.getElementById('cfg-appimage').checked = adapters.includes('appimage');
         document.getElementById('cfg-confirm').checked = Boolean(data.require_confirmation);
         document.getElementById('cfg-loglevel').value = data.log_level || 'INFO';
         document.getElementById('cfg-excluded').value = (data.excluded_packages || []).join(', ');
@@ -1349,6 +1354,7 @@
       if (document.getElementById('cfg-apt').checked) adapters.push('apt');
       if (document.getElementById('cfg-flatpak').checked) adapters.push('flatpak');
       if (document.getElementById('cfg-snap').checked) adapters.push('snap');
+      if (document.getElementById('cfg-appimage').checked) adapters.push('appimage');
 
       const excludedRaw = document.getElementById('cfg-excluded').value;
       const excluded = excludedRaw.split(',').map(s => s.trim()).filter(Boolean);

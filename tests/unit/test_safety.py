@@ -3,10 +3,10 @@ from pathlib import Path
 from ulum.removal.safety import SafetyValidator
 
 def test_system_directories_rejected():
-    for sys_dir in ["/", "/usr", "/bin", "/etc", "/lib", "/var"]:
+    for sys_dir in ["/", "/usr", "/bin", "/etc", "/lib", "/var", "/etc/shadow", "/usr/bin/bash"]:
         valid, msg = SafetyValidator.validate_cleanup_path(sys_dir)
         assert not valid
-        assert "critical system directory" in msg
+        assert ("critical system directory" in msg or "outside permitted cleanup" in msg)
 
 def test_user_home_and_personal_dirs_rejected():
     home = Path.home()

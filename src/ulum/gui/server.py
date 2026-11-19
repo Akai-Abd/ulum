@@ -282,7 +282,7 @@ class UlumApiHandler(http.server.BaseHTTPRequestHandler):
 
         if path == "/api/settings":
             from ulum.core.config import UlumConfig, save_config
-            enabled = payload.get("enabled_adapters", ["apt", "flatpak", "snap"])
+            enabled = payload.get("enabled_adapters", ["apt", "flatpak", "snap", "appimage"])
             excluded = payload.get("excluded_packages", [])
             req_confirm = bool(payload.get("require_confirmation", True))
             log_lvl = payload.get("log_level", "INFO")

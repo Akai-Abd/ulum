@@ -65,26 +65,37 @@ class LeftoverScanner:
         # 3. Check ~/.config and ~/.cache
         GENERIC_SYSTEM_DIRS = {
             "dconf", "gtk-3.0", "gtk-4.0", "pulse", "systemd", "autostart",
-            "ibus", "fontconfig", "mimeapps.list", "user-dirs.dirs", "menus"
+            "ibus", "fontconfig", "mimeapps.list", "user-dirs.dirs", "menus",
+            "cinnamon", "cinnamon-session", "gnome-session", "mate", "xfce4",
+            "thumbnails", "pip", "mesa_shader_cache", "evolution", "sounds",
+            "nemo", "nautilus", "trash", "gstreamer-1.0", "upower"
         }
         for base, ctype in [(home / ".config", "config"), (home / ".cache", "cache")]:
             if base.exists():
-                for entry in base.iterdir():
+                try:
+                    entries = list(base.iterdir())
+                except (OSError, PermissionError):
+                    continue
+                for entry in entries:
                     if entry.is_dir() and not entry.name.startswith("."):
                         name_lower = entry.name.lower()
                         if name_lower in GENERIC_SYSTEM_DIRS:
                             continue
-                        if name_lower not in installed_pkg_ids:
-                            is_valid, _ = SafetyValidator.validate_cleanup_path(entry)
-                            if is_valid:
-                                candidates.append(
-                                    CleanupCandidate(
-                                        path=entry,
-                                        candidate_type=ctype,
-                                        evidence=f"Directory '{entry.name}' not associated with any active package",
-                                        confidence=ConfidenceLevel.PROBABLE,
-                                        estimated_size_bytes=get_dir_size(entry),
-                                    )
+                        if name_lower in installed_pkg_ids or any(
+                            pkg.startswith(name_lower) or name_lower.startswith(pkg)
+                            for pkg in installed_pkg_ids
+                        ):
+                            continue
+                        is_valid, _ = SafetyValidator.validate_cleanup_path(entry)
+                        if is_valid:
+                            candidates.append(
+                                CleanupCandidate(
+                                    path=entry,
+                                    candidate_type=ctype,
+                                    evidence=f"Directory '{entry.name}' not associated with any active package",
+                                    confidence=ConfidenceLevel.PROBABLE,
+                                    estimated_size_bytes=get_dir_size(entry),
                                 )
+                            )
 
         return candidates
