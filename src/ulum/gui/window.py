@@ -495,7 +495,50 @@ class MainWindow(Gtk.Window):
                     str(row["started_at"])[:19],
                 ])
 
+class WebDashboardWindow(Gtk.Window):
+    def __init__(self, port: int, server):
+        super().__init__(title="Universal Linux Update Manager (ULUM)")
+        self.server = server
+        self.set_default_size(1120, 700)
+        self.set_position(Gtk.WindowPosition.CENTER)
+
+        gi.require_version("WebKit2", "4.1")
+        from gi.repository import WebKit2
+        self.webview = WebKit2.WebView()
+        self.webview.load_uri(f"http://127.0.0.1:{port}/")
+        self.add(self.webview)
+
+        self.connect("destroy", self._on_destroy)
+
+    def _on_destroy(self, widget):
+        if self.server:
+            threading.Thread(target=self.server.shutdown, daemon=True).start()
+        Gtk.main_quit()
+
 def run_gui():
-    win = MainWindow()
-    win.show_all()
-    Gtk.main()
+    try:
+        gi.require_version("WebKit2", "4.1")
+        from gi.repository import WebKit2
+        has_webkit = True
+    except Exception:
+        has_webkit = False
+
+    if has_webkit:
+        conn = init_db()
+        repo = Repository(conn)
+        config = load_config()
+        orchestrator = Orchestrator(repo, config)
+
+        from ulum.gui.server import create_server
+        server = create_server(repo, config, orchestrator, host="127.0.0.1", port=0)
+        port = server.server_address[1]
+        t = threading.Thread(target=server.serve_forever, daemon=True)
+        t.start()
+
+        win = WebDashboardWindow(port=port, server=server)
+        win.show_all()
+        Gtk.main()
+    else:
+        win = MainWindow()
+        win.show_all()
+        Gtk.main()
