@@ -1,5 +1,4 @@
 import shutil
-from pathlib import Path
 from typing import List
 from ulum.adapters.base import BaseAdapter
 from ulum.core.models import ExecutionResult, RemovalPlan

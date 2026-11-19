@@ -1,4 +1,3 @@
-import sys
 from ulum.cli.app import app
 
 def cli_entrypoint():

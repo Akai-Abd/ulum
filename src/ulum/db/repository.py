@@ -5,7 +5,6 @@ from typing import List, Optional
 from ulum.core.models import (
     ApplicationRecord,
     CleanupCandidate,
-    ConfidenceLevel,
     ScopeType,
     SourceType,
     UpdateRecord,
@@ -15,9 +14,19 @@ class Repository:
     def __init__(self, conn: sqlite3.Connection):
         self.conn = conn
 
-    def save_applications(self, apps: List[ApplicationRecord]) -> None:
+    def save_applications(self, apps: List[ApplicationRecord], prune_source: Optional[str] = None) -> None:
         now = datetime.datetime.now(datetime.timezone.utc).isoformat()
         with self.conn:
+            if prune_source:
+                current_ids = [a.package_id for a in apps]
+                if current_ids:
+                    placeholders = ",".join("?" for _ in current_ids)
+                    self.conn.execute(
+                        f"DELETE FROM applications WHERE source = ? AND package_id NOT IN ({placeholders})",
+                        [prune_source] + current_ids,
+                    )
+                else:
+                    self.conn.execute("DELETE FROM applications WHERE source = ?", (prune_source,))
             for app in apps:
                 self.conn.execute(
                     """
@@ -44,6 +53,17 @@ class Repository:
                         now,
                     ),
                 )
+
+    def delete_application(self, source: str, package_id: str) -> None:
+        with self.conn:
+            self.conn.execute(
+                "DELETE FROM applications WHERE source = ? AND package_id = ?",
+                (source, package_id),
+            )
+            self.conn.execute(
+                "DELETE FROM updates WHERE source = ? AND package_id = ?",
+                (source, package_id),
+            )
 
     def get_applications(self, source: Optional[str] = None) -> List[ApplicationRecord]:
         query = "SELECT source, source_scope, package_id, display_name, installed_version, install_location, update_supported, remove_supported FROM applications"

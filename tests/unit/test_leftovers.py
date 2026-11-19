@@ -35,3 +35,15 @@ def test_leftover_scanner_detects_uninstalled_flatpak(temp_db, tmp_path, monkeyp
     assert candidates[0].path == leftover_dir
     assert candidates[0].candidate_type == "flatpak_data"
     assert candidates[0].confidence.value == "verified"
+
+def test_leftover_scanner_aborts_on_empty_inventory(temp_db, tmp_path, monkeypatch):
+    repo, _ = temp_db
+    fake_home = tmp_path / "home"
+    var_app = fake_home / ".var" / "app"
+    var_app.mkdir(parents=True)
+    (var_app / "org.mozilla.firefox").mkdir()
+
+    monkeypatch.setattr(Path, "home", lambda: fake_home)
+    scanner = LeftoverScanner(repo)
+    # Empty inventory in DB must return 0 candidates to prevent accidental wipe
+    assert scanner.scan_leftovers() == []

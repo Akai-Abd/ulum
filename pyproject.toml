@@ -6,7 +6,7 @@ build-backend = "flit_core.buildapi"
 name = "ulum"
 version = "0.1.0"
 description = "Universal Linux Update Manager"
-readme = "Universal Linux Update Manager.md"
+readme = "README.md"
 requires-python = ">=3.12"
 dependencies = [
     "typer>=0.12.0",

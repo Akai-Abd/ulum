@@ -1,11 +1,13 @@
 import json
 import threading
 import urllib.request
+from pathlib import Path
 from ulum.core.config import UlumConfig
+from ulum.core.models import CleanupCandidate, ConfidenceLevel
 from ulum.core.orchestrator import Orchestrator
 from ulum.gui.server import create_server
 
-def test_api_server_endpoints(temp_db):
+def test_api_server_endpoints(temp_db, tmp_path, monkeypatch):
     repo, _ = temp_db
     config = UlumConfig()
     orc = Orchestrator(repo, config)
@@ -51,5 +53,21 @@ def test_api_server_endpoints(temp_db):
     with urllib.request.urlopen(req) as res:
       assert res.status == 200
       assert json.loads(res.read().decode("utf-8"))["success"] is True
+
+    # 5. Test POST /api/cleanup with single target path
+    cand_file = tmp_path / "test_cleanup.txt"
+    cand_file.write_text("residual", encoding="utf-8")
+    monkeypatch.setattr("ulum.gui.server.SafetyValidator.validate_cleanup_path", lambda p: (True, ""))
+    repo.save_cleanup_candidates([CleanupCandidate(cand_file, "cache", "test", ConfidenceLevel.VERIFIED)], "test", "test")
+
+    clean_req = urllib.request.Request(
+        f"{base_url}/api/cleanup",
+        data=json.dumps({"path": str(cand_file)}).encode("utf-8"),
+        headers={"Content-Type": "application/json"},
+    )
+    with urllib.request.urlopen(clean_req) as res:
+      assert res.status == 200
+      assert json.loads(res.read().decode("utf-8"))["deleted"] == 1
+    assert not cand_file.exists()
 
     server.shutdown()

@@ -19,9 +19,6 @@ def format_bytes(size: int) -> str:
         size /= 1024.0
     return f"{size:.1f} TB"
 
-def print_banner() -> None:
-    console.print("[bold cyan]Universal Linux Update Manager (ULUM)[/bold cyan]")
-
 def print_system_info(info: SystemInfo, managers: Dict[str, bool]) -> None:
     table = Table(show_header=False, box=None)
     table.add_row("[bold]Distribution:[/bold]", f"{info.distro_name} {info.distro_version} ({info.distro_id})")

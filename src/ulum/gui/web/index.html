@@ -1322,7 +1322,11 @@
 
     window.handleCleanOne = function(path) {
       showModal('Delete Leftover Path', `Permanently remove residual path:\n${path}?`, null, async () => {
-        await fetch('/api/cleanup', { method: 'POST', body: '{}' });
+        await fetch('/api/cleanup', {
+          method: 'POST',
+          headers: {'Content-Type': 'application/json'},
+          body: JSON.stringify({ path: path })
+        });
         await renderTable();
         await loadStats();
       });

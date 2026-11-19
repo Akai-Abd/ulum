@@ -80,3 +80,21 @@ def test_removal_history(temp_db):
     assert len(hist) == 1
     assert hist[0]["package_id"] == "vlc"
     assert "vlc" in hist[0]["removed_packages"]
+
+def test_delete_application_and_prune(temp_db):
+    repo, _ = temp_db
+    app1 = ApplicationRecord(SourceType.APT, ScopeType.SYSTEM, "curl", "curl", "7.88.1")
+    app2 = ApplicationRecord(SourceType.APT, ScopeType.SYSTEM, "vim", "vim", "9.0")
+    repo.save_applications([app1, app2])
+    repo.save_updates([UpdateRecord(app1, "7.88.2")])
+
+    # Delete curl
+    repo.delete_application("apt", "curl")
+    assert repo.get_application_by_id("apt:curl") is None
+    assert len(repo.get_updates()) == 0
+    assert repo.get_application_by_id("apt:vim") is not None
+
+    # Prune apt source with only vim
+    repo.save_applications([app1], prune_source="apt")
+    assert repo.get_application_by_id("apt:curl") is not None
+    assert repo.get_application_by_id("apt:vim") is None

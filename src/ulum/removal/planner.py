@@ -1,4 +1,3 @@
-import os
 from pathlib import Path
 from typing import List
 from ulum.adapters.base import BaseAdapter

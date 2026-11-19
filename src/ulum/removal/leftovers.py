@@ -1,25 +1,35 @@
 from pathlib import Path
-from typing import List, Set
+from typing import Dict, List, Optional, Set
+from ulum.adapters.base import BaseAdapter
 from ulum.core.models import CleanupCandidate, ConfidenceLevel
 from ulum.db.repository import Repository
 from ulum.removal.planner import get_dir_size
 from ulum.removal.safety import SafetyValidator
+from ulum.utils.logging import logger
 
 class LeftoverScanner:
-    def __init__(self, repo: Repository):
+    def __init__(self, repo: Repository, adapters: Optional[Dict[str, BaseAdapter]] = None):
         self.repo = repo
+        self.adapters = adapters
 
     def scan_leftovers(self) -> List[CleanupCandidate]:
         installed = self.repo.get_applications()
         installed_pkg_ids: Set[str] = {app.package_id.lower() for app in installed}
+        if not installed_pkg_ids:
+            logger.warning("Application inventory is empty. Run 'ulum scan' before scanning for leftovers.")
+            return []
+
         candidates: List[CleanupCandidate] = []
         home = Path.home()
 
         # 1. Check ~/.var/app (Flatpak data)
         flatpak_data = home / ".var" / "app"
         if flatpak_data.exists():
+            flatpak_adp = self.adapters.get("flatpak") if self.adapters else None
             for entry in flatpak_data.iterdir():
                 if entry.is_dir() and entry.name.lower() not in installed_pkg_ids:
+                    if flatpak_adp and flatpak_adp.is_available() and flatpak_adp.verify_state(entry.name):
+                        continue
                     is_valid, _ = SafetyValidator.validate_cleanup_path(entry)
                     if is_valid:
                         candidates.append(
@@ -35,8 +45,11 @@ class LeftoverScanner:
         # 2. Check ~/snap (Snap user data)
         snap_data = home / "snap"
         if snap_data.exists():
+            snap_adp = self.adapters.get("snap") if self.adapters else None
             for entry in snap_data.iterdir():
                 if entry.is_dir() and entry.name.lower() not in installed_pkg_ids:
+                    if snap_adp and snap_adp.is_available() and snap_adp.verify_state(entry.name):
+                        continue
                     is_valid, _ = SafetyValidator.validate_cleanup_path(entry)
                     if is_valid:
                         candidates.append(

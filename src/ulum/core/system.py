@@ -1,7 +1,7 @@
 import os
 import platform
 from pathlib import Path
-from typing import Dict, List
+from typing import Dict
 from ulum.core.models import SystemInfo
 from ulum.utils.process import command_exists
 

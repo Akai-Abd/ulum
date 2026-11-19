@@ -1,3 +1,4 @@
+from pathlib import Path
 import shutil
 from typing import Optional
 import typer
@@ -206,7 +207,7 @@ def remove_cmd(
 def leftovers_cmd():
     """Discover unassociated cache, configuration, or data leftovers."""
     orc = get_orchestrator()
-    scanner = LeftoverScanner(orc.repo)
+    scanner = LeftoverScanner(orc.repo, adapters=orc.adapters)
     with console.status("[bold cyan]Scanning for residual leftover candidates...[/bold cyan]"):
         candidates = scanner.scan_leftovers()
     orc.repo.save_cleanup_candidates(candidates, source="system", package_id="<residual>")
@@ -233,16 +234,19 @@ def cleanup_cmd(
             return
 
     for c in candidates:
-        p = c["path"]
+        p = Path(c["path"])
         is_valid, reason = SafetyValidator.validate_cleanup_path(p)
-        if is_valid:
+        if is_valid and p.exists():
             try:
-                shutil.rmtree(p)
-                orc.repo.mark_candidate_removed(p)
+                if p.is_dir() and not p.is_symlink():
+                    shutil.rmtree(p)
+                else:
+                    p.unlink()
+                orc.repo.mark_candidate_removed(str(p))
                 console.print(f"[green]✓ Deleted:[/green] {p}")
             except Exception as e:
                 console.print(f"[red]Failed to delete {p}:[/red] {e}")
-        else:
+        elif not is_valid:
             console.print(f"[yellow]Skipped {p}:[/yellow] {reason}")
 
 @app.command("dependencies")

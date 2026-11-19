@@ -38,7 +38,7 @@ class Orchestrator:
         for name, adapter in self.get_available_adapters().items():
             logger.info("Scanning installed packages for source '%s'...", name)
             apps = adapter.list_installed()
-            self.repo.save_applications(apps)
+            self.repo.save_applications(apps, prune_source=name)
             counts[name] = len(apps)
         return counts
 
@@ -170,6 +170,8 @@ class Orchestrator:
         finished = datetime.datetime.now(datetime.timezone.utc).isoformat()
 
         if not dry_run:
+            if res.success:
+                self.repo.delete_application(plan.application.source.value, plan.application.package_id)
             self.repo.record_removal_history(
                 source=plan.application.source.value,
                 package_id=plan.application.package_id,

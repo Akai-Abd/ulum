@@ -2,7 +2,6 @@ import http.server
 import json
 import os
 import socketserver
-import threading
 from pathlib import Path
 from typing import Any, Dict
 from urllib.parse import parse_qs, urlparse
@@ -227,7 +226,7 @@ class UlumApiHandler(http.server.BaseHTTPRequestHandler):
             return
 
         if path == "/api/scan_leftovers":
-            scanner = LeftoverScanner(self.repo)
+            scanner = LeftoverScanner(self.repo, adapters=self.orchestrator.adapters)
             cands = scanner.scan_leftovers()
             self.repo.save_cleanup_candidates(cands, source="system", package_id="<residual>")
             self.send_json({"success": True, "count": len(cands)})
@@ -235,18 +234,25 @@ class UlumApiHandler(http.server.BaseHTTPRequestHandler):
 
         if path == "/api/cleanup":
             import shutil
-            cands = self.repo.get_cleanup_candidates(confidence="verified")
+            target_path = payload.get("path")
+            if target_path:
+                cands = [c for c in self.repo.get_cleanup_candidates() if c["path"] == target_path]
+            else:
+                cands = self.repo.get_cleanup_candidates(confidence="verified")
             deleted = 0
             for c in cands:
-                p = c["path"]
+                p = Path(c["path"])
                 valid, _ = SafetyValidator.validate_cleanup_path(p)
-                if valid:
+                if valid and p.exists():
                     try:
-                        shutil.rmtree(p)
-                        self.repo.mark_candidate_removed(p)
+                        if p.is_dir() and not p.is_symlink():
+                            shutil.rmtree(p)
+                        else:
+                            p.unlink()
+                        self.repo.mark_candidate_removed(str(p))
                         deleted += 1
-                    except Exception:
-                        pass
+                    except Exception as e:
+                        logger.error("Failed to delete %s: %s", p, e)
             self.send_json({"success": True, "deleted": deleted})
             return
 

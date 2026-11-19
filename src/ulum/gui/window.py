@@ -1,4 +1,5 @@
 import os
+from pathlib import Path
 import shutil
 import threading
 from typing import Callable, Optional
@@ -13,7 +14,7 @@ from gi.repository import GLib, Gtk
 from ulum.cli.display import format_bytes
 from ulum.core.config import load_config
 from ulum.core.orchestrator import Orchestrator
-from ulum.core.system import detect_package_managers, get_system_info
+from ulum.core.system import get_system_info
 from ulum.db.database import init_db
 from ulum.db.repository import Repository
 from ulum.gui.dialogs import RemovalConfirmDialog, show_error_dialog, show_info_dialog
@@ -387,7 +388,7 @@ class MainWindow(Gtk.Window):
         self.notebook.append_page(box, Gtk.Label(label="Leftovers & Cleanup"))
 
     def on_scan_leftovers_clicked(self):
-        scanner = LeftoverScanner(self.repo)
+        scanner = LeftoverScanner(self.repo, adapters=self.orchestrator.adapters)
 
         def task():
             cands = scanner.scan_leftovers()
@@ -434,12 +435,15 @@ class MainWindow(Gtk.Window):
 
         deleted = 0
         for c in cands:
-            p = c["path"]
+            p = Path(c["path"])
             valid, _ = SafetyValidator.validate_cleanup_path(p)
-            if valid:
+            if valid and p.exists():
                 try:
-                    shutil.rmtree(p)
-                    self.repo.mark_candidate_removed(p)
+                    if p.is_dir() and not p.is_symlink():
+                        shutil.rmtree(p)
+                    else:
+                        p.unlink()
+                    self.repo.mark_candidate_removed(str(p))
                     deleted += 1
                 except Exception:
                     pass

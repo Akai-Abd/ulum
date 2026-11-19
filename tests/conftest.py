@@ -1,6 +1,5 @@
 import os
 import tempfile
-from pathlib import Path
 import pytest
 from ulum.db.database import init_db
 from ulum.db.repository import Repository
