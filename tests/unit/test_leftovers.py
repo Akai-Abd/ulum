@@ -1,0 +1,37 @@
+from pathlib import Path
+from ulum.core.models import ApplicationRecord, ScopeType, SourceType
+from ulum.removal.leftovers import LeftoverScanner
+
+def test_leftover_scanner_detects_uninstalled_flatpak(temp_db, tmp_path, monkeypatch):
+    repo, _ = temp_db
+    fake_home = tmp_path / "home"
+    var_app = fake_home / ".var" / "app"
+    var_app.mkdir(parents=True)
+    
+    # One installed flatpak app, one leftover dir
+    app = ApplicationRecord(
+        source=SourceType.FLATPAK,
+        source_scope=ScopeType.USER,
+        package_id="org.mozilla.firefox",
+        display_name="Firefox",
+        installed_version="125.0",
+    )
+    repo.save_applications([app])
+
+    # Leftover directory: org.videolan.vlc
+    leftover_dir = var_app / "org.videolan.vlc"
+    leftover_dir.mkdir()
+    (leftover_dir / "cache.bin").write_text("data", encoding="utf-8")
+
+    # Valid directory for installed app
+    (var_app / "org.mozilla.firefox").mkdir()
+
+    monkeypatch.setattr(Path, "home", lambda: fake_home)
+
+    scanner = LeftoverScanner(repo)
+    candidates = scanner.scan_leftovers()
+
+    assert len(candidates) == 1
+    assert candidates[0].path == leftover_dir
+    assert candidates[0].candidate_type == "flatpak_data"
+    assert candidates[0].confidence.value == "verified"

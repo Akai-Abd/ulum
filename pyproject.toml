@@ -1,0 +1,24 @@
+[build-system]
+requires = ["flit_core >=3.2,<4"]
+build-backend = "flit_core.buildapi"
+
+[project]
+name = "ulum"
+version = "0.1.0"
+description = "Universal Linux Update Manager"
+readme = "Universal Linux Update Manager.md"
+requires-python = ">=3.12"
+dependencies = [
+    "typer>=0.12.0",
+    "rich>=13.0.0",
+]
+
+[project.scripts]
+ulum = "ulum.main:cli_entrypoint"
+
+[tool.flit.module]
+name = "ulum"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["src"]
