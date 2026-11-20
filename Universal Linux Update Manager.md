@@ -1,12 +1,12 @@
 # Product Requirements Document (PRD)
 # Universal Linux Update Manager (ULUM)
 
-**Document version:** 1.1  
-**Status:** Product definition / implementation baseline  
-**Product type:** Open-source Linux CLI utility, with optional TUI  
+**Document version:** 0.2.2  
+**Status:** Implemented (v0.2.2 Active Baseline)  
+**Product type:** Open-source Linux CLI utility and Modern GTK3/WebKit2 Desktop GUI  
 **Initial target platforms:** Linux Mint 22.x and Ubuntu 24.04 LTS  
 **Primary implementation language:** Python 3.12+  
-**Proposed command:** `ulum`
+**Proposed command:** `ulum` (CLI) / `ulum-gui` (GUI)
 
 ---
 
@@ -854,34 +854,34 @@ All destructive logic must be tested with temporary directories and mocked packa
 
 ### 19.1 MVP acceptance
 
-- [ ] Detects Linux Mint and Ubuntu.
-- [ ] Detects APT, Flatpak, and Snap availability.
-- [ ] Inventories installed applications with source-qualified identifiers.
-- [ ] Checks updates across supported sources.
-- [ ] Reports source errors separately from zero updates.
-- [ ] Previews updates where supported.
-- [ ] Updates selected applications and all eligible applications.
-- [ ] Records update history.
-- [ ] Supports standard uninstall for APT, Flatpak, and Snap.
-- [ ] Previews removal operations.
-- [ ] Requires approval for destructive operations.
-- [ ] Protects shared dependencies and user data.
-- [ ] Handles missing package managers and operation failures.
-- [ ] Provides diagnostics and installation/uninstallation documentation.
+- [x] Detects Linux Mint and Ubuntu.
+- [x] Detects APT, Flatpak, and Snap availability.
+- [x] Inventories installed applications with source-qualified identifiers.
+- [x] Checks updates across supported sources.
+- [x] Reports source errors separately from zero updates.
+- [x] Previews updates where supported.
+- [x] Updates selected applications and all eligible applications.
+- [x] Records update history.
+- [x] Supports standard uninstall for APT, Flatpak, and Snap.
+- [x] Previews removal operations.
+- [x] Requires approval for destructive operations.
+- [x] Protects shared dependencies and user data.
+- [x] Handles missing package managers and operation failures.
+- [x] Provides diagnostics and installation/uninstallation documentation.
 
 ### 19.2 Complete-removal acceptance
 
-- [ ] Offers a complete-removal plan.
-- [ ] Identifies configuration, cache, logs, and data candidates.
-- [ ] Distinguishes verified, probable, and unknown ownership.
-- [ ] Uses native dependency analysis.
-- [ ] Shows exact paths and proposed package removals.
-- [ ] Requires explicit approval for user-data deletion.
-- [ ] Never manually deletes package-managed shared libraries.
-- [ ] Revalidates paths and ownership before deletion.
-- [ ] Records removed and preserved items.
-- [ ] Verifies the resulting state.
-- [ ] Reports partial cleanup honestly.
+- [x] Offers a complete-removal plan.
+- [x] Identifies configuration, cache, logs, and data candidates.
+- [x] Distinguishes verified, probable, and unknown ownership.
+- [x] Uses native dependency analysis.
+- [x] Shows exact paths and proposed package removals.
+- [x] Requires explicit approval for user-data deletion.
+- [x] Never manually deletes package-managed shared libraries.
+- [x] Revalidates paths and ownership before deletion.
+- [x] Records removed and preserved items.
+- [x] Verifies the resulting state.
+- [x] Reports partial cleanup honestly.
 
 ## 20. Product decisions
 
@@ -889,15 +889,15 @@ All destructive logic must be tested with temporary directories and mocked packa
 |---|---|
 | Replace native package managers? | No |
 | Require root for scanning? | No, unless a specific source requires it |
-| Install updates automatically? | No; user-controlled initially |
-| Update arbitrary binaries? | No; require a supported integration |
+| Install updates automatically? | Optional systemd scheduled updates (`ulum schedule`) |
+| Update arbitrary binaries? | Supported for AppImage binaries in ~/Applications |
 | Remove arbitrary binaries? | No; require a verified manifest or explicit safe procedure |
 | Delete user data by default? | Never |
 | Remove shared dependencies manually? | Never |
 | Run broad autoremove silently? | Never |
 | Perform cleanup without preview? | Never |
-| Support multiple distributions? | Incrementally |
-| Provide GUI in MVP? | No; CLI first, optional TUI |
+| Support multiple distributions? | Mint & Ubuntu full MVP, expandable |
+| Provide GUI in MVP? | Implemented in v0.2+ (GTK3 + WebKit2 Dashboard) |
 
 ## 21. Risks and mitigations
 
@@ -914,16 +914,17 @@ All destructive logic must be tested with temporary directories and mocked packa
 
 ## 22. Future enhancements
 
-- GUI desktop application.
-- Scheduled update checks and optional user-approved automation.
-- Fedora, Arch, and openSUSE adapters.
-- More application-specific updater integrations.
-- System tray notifications.
-- Security update prioritization.
-- Exportable inventory, update, and removal reports.
-- Backup integration before selected destructive cleanup.
-- Rollback assistance where supported by the package manager or filesystem.
-- Repository/source management with separate safety and trust requirements.
+- [x] GUI desktop application (GTK3 + WebKit2 glassmorphic dashboard).
+- [x] Scheduled update checks and background automation (user systemd timer).
+- [x] Pre-update snapshot integration (Timeshift / Snapper restore points).
+- [x] Health repair and auto-fix diagnostics (`ulum doctor --fix`).
+- [ ] Fedora, Arch, and openSUSE adapters (DNF, Pacman, Zypper).
+- [ ] More application-specific updater integrations.
+- [ ] System tray notifications.
+- [ ] Security update prioritization.
+- [ ] Exportable inventory, update, and removal reports.
+- [ ] Rollback assistance where supported by the package manager or filesystem.
+- [ ] Repository/source management with separate safety and trust requirements.
 
 ## 23. Recommended MVP scope
 

@@ -62,6 +62,18 @@ Seamlessly orchestrate software updates and clean removals across **APT**, **Fla
 
 ### 1. Installation
 
+#### Option A: Debian Package (.deb) — Recommended
+
+Install the pre-built `.deb` package directly:
+
+```bash
+sudo dpkg -i ulum_0.2.2_all.deb
+# Or from the repository root:
+sudo dpkg -i dist/ulum_0.2.2_all.deb
+```
+
+#### Option B: From Source (Development)
+
 ```bash
 # Clone the repository
 git clone https://github.com/Akai-Abd/ulum.git
@@ -161,18 +173,18 @@ pytest -v
 ```
 
 ```text
-tests/integration/test_cli.py ........
-tests/unit/test_adapters.py .....
-tests/unit/test_db.py ....
-tests/unit/test_executor.py ..
+tests/integration/test_cli.py .....
+tests/unit/test_adapters.py ......
+tests/unit/test_db.py .....
+tests/unit/test_executor.py ....
 tests/unit/test_gui.py .
 tests/unit/test_leftovers.py ...
-tests/unit/test_planner.py ..
+tests/unit/test_planner.py ...
 tests/unit/test_safety.py .....
 tests/unit/test_server.py .
 tests/unit/test_system_and_config.py ...
 
-============================== 31 passed ==============================
+============================== 36 passed ==============================
 ```
 
 ---
