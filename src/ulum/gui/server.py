@@ -332,7 +332,7 @@ class UlumApiHandler(http.server.BaseHTTPRequestHandler):
             enabled = payload.get("enabled_adapters", ["apt", "flatpak", "snap", "appimage"])
             excluded = payload.get("excluded_packages", [])
             req_confirm = bool(payload.get("require_confirmation", True))
-            log_lvl = payload.get("log_level", "INFO")
+            log_lvl = str(payload.get("log_level", "INFO")).upper()
             new_cfg = UlumConfig(
                 enabled_adapters=enabled,
                 excluded_packages=excluded,

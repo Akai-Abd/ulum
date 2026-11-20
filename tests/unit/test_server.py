@@ -56,12 +56,17 @@ def test_api_server_endpoints(temp_db, tmp_path, monkeypatch):
 
     req = urllib.request.Request(
         f"{base_url}/api/settings",
-        data=json.dumps({"enabled_adapters": ["apt"], "require_confirmation": True}).encode("utf-8"),
+        data=json.dumps({"enabled_adapters": ["apt"], "require_confirmation": False, "log_level": "debug"}).encode("utf-8"),
         headers={"Content-Type": "application/json"},
     )
     with urllib.request.urlopen(req) as res:
       assert res.status == 200
       assert json.loads(res.read().decode("utf-8"))["success"] is True
+
+    with urllib.request.urlopen(f"{base_url}/api/settings") as res:
+      cfg2 = json.loads(res.read().decode("utf-8"))
+      assert cfg2["require_confirmation"] is False
+      assert cfg2["log_level"] == "DEBUG"
 
     # 5. Test POST /api/cleanup with single target path
     cand_file = tmp_path / "test_cleanup.txt"

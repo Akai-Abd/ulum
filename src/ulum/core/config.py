@@ -28,7 +28,7 @@ def load_config(config_path: Path | None = None) -> UlumConfig:
             enabled_adapters=data.get("enabled_adapters", ["apt", "flatpak", "snap", "appimage"]),
             excluded_packages=data.get("excluded_packages", []),
             require_confirmation=data.get("require_confirmation", True),
-            log_level=data.get("log_level", "INFO"),
+            log_level=str(data.get("log_level", "INFO")).upper(),
         )
     except Exception:
         return UlumConfig()

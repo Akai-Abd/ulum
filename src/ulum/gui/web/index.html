@@ -695,9 +695,12 @@
       background-color: #141a26;
       border: 1px solid var(--card-border);
       color: #ffffff;
+      -webkit-text-fill-color: #ffffff;
       padding: 7px 12px;
       border-radius: 8px;
       font-size: 12px;
+      height: 32px;
+      line-height: 16px;
       outline: none;
       width: 180px;
       box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.3);
@@ -715,6 +718,9 @@
       -moz-appearance: none;
       cursor: pointer;
       padding-right: 32px;
+      background-color: #141a26;
+      color: #ffffff;
+      -webkit-text-fill-color: #ffffff;
       background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%2394a3b8' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'%3E%3C/polyline%3E%3C/svg%3E");
       background-repeat: no-repeat;
       background-position: right 10px center;
@@ -723,6 +729,7 @@
     .settings-row select option {
       background-color: #141a26;
       color: #ffffff;
+      -webkit-text-fill-color: #ffffff;
       padding: 8px 12px;
     }
 
@@ -803,7 +810,7 @@
       </div>
       <div class="brand-text">
         <h2>ULUM</h2>
-        <span id="brand-version">v1.1</span>
+        <span id="brand-version">v0.2.2</span>
       </div>
     </div>
 
@@ -1117,6 +1124,7 @@
 
     let currentTab = 'dashboard';
     let currentSourceFilter = 'all';
+    let requireConfirmation = true;
     let allUpdates = [];
     let allInventory = [];
     let allLeftovers = [];
@@ -1304,8 +1312,24 @@
         document.getElementById('cfg-flatpak').checked = adapters.includes('flatpak');
         document.getElementById('cfg-snap').checked = adapters.includes('snap');
         document.getElementById('cfg-appimage').checked = adapters.includes('appimage');
-        document.getElementById('cfg-confirm').checked = Boolean(data.require_confirmation);
-        document.getElementById('cfg-loglevel').value = data.log_level || 'INFO';
+        requireConfirmation = data.require_confirmation !== false;
+        document.getElementById('cfg-confirm').checked = requireConfirmation;
+
+        const rawLevel = String(data.log_level || 'INFO').trim().toUpperCase();
+        const selLogLevel = document.getElementById('cfg-loglevel');
+        if (selLogLevel) {
+          let matched = false;
+          for (let i = 0; i < selLogLevel.options.length; i++) {
+            if (selLogLevel.options[i].value.toUpperCase() === rawLevel) {
+              selLogLevel.selectedIndex = i;
+              matched = true;
+              break;
+            }
+          }
+          if (!matched && selLogLevel.options.length > 0) {
+            selLogLevel.selectedIndex = 0;
+          }
+        }
         document.getElementById('cfg-excluded').value = (data.excluded_packages || []).join(', ');
         document.getElementById('cfg-path-txt').innerText = data.config_path;
         document.getElementById('db-path-txt').innerText = data.db_path;
@@ -1578,6 +1602,10 @@
 
     // Modal Helper
     function showModal(title, desc, details, onConfirm, showSnapshotOption = false) {
+      if (!requireConfirmation) {
+        onConfirm(false);
+        return;
+      }
       document.getElementById('modal-title').innerText = title;
       document.getElementById('modal-desc').innerText = desc;
       const det = document.getElementById('modal-details');
@@ -1683,6 +1711,7 @@
       const excluded = excludedRaw.split(',').map(s => s.trim()).filter(Boolean);
       const reqConfirm = document.getElementById('cfg-confirm').checked;
       const logLevel = document.getElementById('cfg-loglevel').value;
+      requireConfirmation = reqConfirm;
 
       try {
         await fetch('/api/settings', {
@@ -1841,6 +1870,7 @@
     // Initial load
     loadStats();
     loadData();
+    loadSettings();
   </script>
 </body>
 </html>
