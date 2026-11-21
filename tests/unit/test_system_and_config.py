@@ -34,3 +34,28 @@ def test_system_snapshot_fallback(monkeypatch):
     ok, msg = create_system_snapshot()
     assert ok is False
     assert "Neither Timeshift nor Snapper" in msg
+
+def test_run_cmd_elevation_pkexec(monkeypatch):
+    import subprocess
+    import sys
+    from ulum.utils.process import run_cmd
+
+    captured_cmds = []
+
+    monkeypatch.setattr("ulum.utils.process.is_root", lambda: False)
+    monkeypatch.setattr("ulum.utils.process.command_exists", lambda b: True)
+    monkeypatch.setattr(sys.stdin, "isatty", lambda: False)
+
+    def mock_subprocess_run(cmd, **kwargs):
+        captured_cmds.append(list(cmd))
+        if cmd == ["sudo", "-n", "true"]:
+            return subprocess.CompletedProcess(cmd, 1, "", "password required")
+        return subprocess.CompletedProcess(cmd, 0, "ok", "")
+
+    monkeypatch.setattr(subprocess, "run", mock_subprocess_run)
+
+    res = run_cmd(["apt-get", "install", "-y", "pkg"], require_root=True)
+    assert res.returncode == 0
+    # Must use pkexec in GUI / non-tty when sudo is not passwordless
+    assert any("pkexec" in c[0] for c in captured_cmds)
+

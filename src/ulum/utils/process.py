@@ -1,6 +1,7 @@
 import os
 import shutil
 import subprocess
+import sys
 from typing import Optional, Sequence
 from ulum.utils.logging import logger
 
@@ -20,9 +21,33 @@ def run_cmd(
 ) -> subprocess.CompletedProcess[str]:
     full_cmd = list(cmd)
     if require_root and not is_root():
-        if not command_exists("sudo"):
-            raise PermissionError("Root privileges required but 'sudo' was not found.")
-        full_cmd = ["sudo"] + full_cmd
+        can_sudo_nopasswd = False
+        if command_exists("sudo"):
+            try:
+                can_sudo_nopasswd = (
+                    subprocess.run(
+                        ["sudo", "-n", "true"],
+                        capture_output=True,
+                        timeout=5,
+                    ).returncode == 0
+                )
+            except Exception:
+                can_sudo_nopasswd = False
+
+        is_gui_or_non_tty = (not sys.stdin.isatty()) or bool(
+            os.environ.get("DISPLAY") or os.environ.get("WAYLAND_DISPLAY")
+        )
+
+        if not can_sudo_nopasswd and is_gui_or_non_tty and command_exists("pkexec"):
+            prog = shutil.which(full_cmd[0]) or full_cmd[0]
+            full_cmd = ["pkexec", prog] + full_cmd[1:]
+        elif command_exists("sudo"):
+            full_cmd = ["sudo"] + full_cmd
+        elif command_exists("pkexec"):
+            prog = shutil.which(full_cmd[0]) or full_cmd[0]
+            full_cmd = ["pkexec", prog] + full_cmd[1:]
+        else:
+            raise PermissionError("Root privileges required but neither 'sudo' nor 'pkexec' was found.")
 
     full_env = os.environ.copy()
     if env:

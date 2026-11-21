@@ -1491,13 +1491,28 @@
       document.getElementById('btn-update-all').innerText = `Update All (${allUpdates.length})`;
       document.getElementById('btn-update-all').onclick = () => {
         showModal('Update All Software', `Proceed with updating all ${allUpdates.length} eligible applications?`, null, async (snapshot) => {
-          await fetch('/api/update', {
-            method: 'POST',
-            headers: {'Content-Type': 'application/json'},
-            body: JSON.stringify({ all: true, snapshot: snapshot })
-          });
-          await loadStats();
-          await loadData();
+          const btnAll = document.getElementById('btn-update-all');
+          const origText = btnAll.innerText;
+          btnAll.disabled = true;
+          btnAll.innerHTML = '<div class="spinner" style="display:inline-block;vertical-align:middle;margin-right:6px;"></div> Updating...';
+          try {
+            const res = await fetch('/api/update', {
+              method: 'POST',
+              headers: {'Content-Type': 'application/json'},
+              body: JSON.stringify({ all: true, snapshot: snapshot })
+            });
+            const data = await res.json();
+            if (!data.success) {
+              alert('Update failed:\n' + (data.logs ? data.logs.join('\n') : 'Unknown error occurred.'));
+            }
+            await loadStats();
+            await loadData();
+          } catch (e) {
+            alert('Update error: ' + e);
+          } finally {
+            btnAll.disabled = false;
+            btnAll.innerText = origText;
+          }
         }, true);
       };
 
@@ -1580,7 +1595,7 @@
           const btn = document.createElement('button');
           btn.className = 'btn-action-update';
           btn.textContent = 'Update';
-          btn.addEventListener('click', () => handleUpdate(r.qualified_id));
+          btn.addEventListener('click', () => handleUpdate(r.qualified_id, btn));
           actionCell.appendChild(btn);
         } else {
           const btnReinstall = document.createElement('button');
@@ -1638,18 +1653,32 @@
     }
 
     // Actions
-    window.handleUpdate = function(qualifiedId) {
+    window.handleUpdate = function(qualifiedId, btn) {
       showModal('Update Application', `Proceed with updating ${qualifiedId}?`, null, async (snapshot) => {
+        const origText = btn ? btn.innerHTML : '';
+        if (btn) {
+          btn.disabled = true;
+          btn.innerHTML = '<div class="spinner" style="display:inline-block;vertical-align:middle;margin-right:6px;"></div> Updating...';
+        }
         try {
-          await fetch('/api/update', {
+          const res = await fetch('/api/update', {
             method: 'POST',
             headers: {'Content-Type': 'application/json'},
             body: JSON.stringify({ identifier: qualifiedId, snapshot: snapshot })
           });
+          const data = await res.json();
+          if (!data.success) {
+            alert('Update failed:\n' + (data.logs ? data.logs.join('\n') : 'Unknown error occurred.'));
+          }
           await loadStats();
           await loadData();
         } catch (e) {
           alert('Update error: ' + e);
+        } finally {
+          if (btn) {
+            btn.disabled = false;
+            btn.innerHTML = origText;
+          }
         }
       }, true);
     };

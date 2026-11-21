@@ -248,7 +248,7 @@ class UlumApiHandler(http.server.BaseHTTPRequestHandler):
                 results = self.orchestrator.execute_updates(
                     targets=targets, source=source, dry_run=False, create_snapshot=snapshot
                 )
-                success = all(r.success for _, r in results)
+                success = len(results) > 0 and all(r.success for _, r in results)
                 for src, res in results:
                     status_text = "succeeded" if res.success else f"failed: {res.error_summary or res.stderr}"
                     CURRENT_OPERATION["logs"].append(f"[{src.upper()}] {status_text}")
