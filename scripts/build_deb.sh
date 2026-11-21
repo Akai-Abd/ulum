@@ -48,6 +48,7 @@ export WEBKIT_DISABLE_COMPOSITING_MODE=1
 
 # Run as root via pkexec if invoked as non-root
 if [ "$(id -u)" -ne 0 ]; then
+    command -v xhost >/dev/null 2>&1 && xhost +SI:localuser:root >/dev/null 2>&1
     if command -v pkexec >/dev/null 2>&1; then
         exec pkexec /usr/bin/ulum-gui "$@"
     fi

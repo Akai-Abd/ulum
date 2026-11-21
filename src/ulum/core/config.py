@@ -5,8 +5,23 @@ from pathlib import Path
 from typing import List
 
 def get_config_dir() -> Path:
-    xdg = os.environ.get("XDG_CONFIG_HOME")
-    base = Path(xdg) if xdg else Path.home() / ".config"
+    pkexec_uid = os.environ.get("PKEXEC_UID")
+    real_user = os.environ.get("SUDO_USER")
+    if pkexec_uid:
+        try:
+            import pwd
+            base = Path(pwd.getpwuid(int(pkexec_uid)).pw_dir) / ".config"
+        except Exception:
+            base = Path.home() / ".config"
+    elif real_user:
+        try:
+            import pwd
+            base = Path(pwd.getpwnam(real_user).pw_dir) / ".config"
+        except Exception:
+            base = Path.home() / ".config"
+    else:
+        xdg = os.environ.get("XDG_CONFIG_HOME")
+        base = Path(xdg) if xdg else Path.home() / ".config"
     return base / "ulum"
 
 @dataclass

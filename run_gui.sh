@@ -6,6 +6,7 @@ DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" >/dev/null 2>&1 && pwd)"
 
 # Run as root via pkexec if invoked as non-root
 if [ "$(id -u)" -ne 0 ]; then
+    command -v xhost >/dev/null 2>&1 && xhost +SI:localuser:root >/dev/null 2>&1
     if command -v pkexec >/dev/null 2>&1; then
         exec pkexec "$DIR/run_gui.sh" "$@"
     fi

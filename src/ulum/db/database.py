@@ -3,8 +3,23 @@ import sqlite3
 from pathlib import Path
 
 def get_data_dir() -> Path:
-    xdg = os.environ.get("XDG_DATA_HOME")
-    base = Path(xdg) if xdg else Path.home() / ".local" / "share"
+    pkexec_uid = os.environ.get("PKEXEC_UID")
+    real_user = os.environ.get("SUDO_USER")
+    if pkexec_uid:
+        try:
+            import pwd
+            base = Path(pwd.getpwuid(int(pkexec_uid)).pw_dir) / ".local" / "share"
+        except Exception:
+            base = Path.home() / ".local" / "share"
+    elif real_user:
+        try:
+            import pwd
+            base = Path(pwd.getpwnam(real_user).pw_dir) / ".local" / "share"
+        except Exception:
+            base = Path.home() / ".local" / "share"
+    else:
+        xdg = os.environ.get("XDG_DATA_HOME")
+        base = Path(xdg) if xdg else Path.home() / ".local" / "share"
     data_dir = base / "ulum"
     data_dir.mkdir(parents=True, exist_ok=True)
     return data_dir
