@@ -986,6 +986,8 @@
             <svg style="width:14px;height:14px;stroke:currentColor;fill:none;stroke-width:2;" viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
             <input type="text" id="table-search-input" placeholder="Search">
           </div>
+          <span id="badge-download-size" style="display:none;padding:5px 10px;border-radius:20px;font-size:11px;font-weight:600;align-items:center;gap:4px;"></span>
+          <button class="btn-action-dark" id="btn-secondary-action" style="display:none;padding:7px 12px;font-size:12px;"></button>
           <button class="btn-update-all" id="btn-update-all">Update All (<span id="btn-upd-count">19</span>)</button>
         </div>
       </div>
@@ -1071,6 +1073,20 @@
               <span>Excluded Packages (comma separated)</span>
               <input type="text" id="cfg-excluded" placeholder="e.g. apt:linux-headers, snap:vlc" style="width:300px;">
             </div>
+          </div>
+
+          <div class="settings-card" style="grid-column: span 2;">
+            <div style="display:flex;justify-content:space-between;align-items:center;">
+              <div>
+                <h3 style="margin:0 0 4px 0;">ULUM Application Updates</h3>
+                <p style="margin:0;font-size:12px;color:#94a3b8;">Check GitHub for new ULUM releases, bugfixes, and feature updates.</p>
+              </div>
+              <button class="btn-action-dark" id="btn-check-app-update" style="display:flex;align-items:center;gap:6px;padding:8px 14px;border:1px solid rgba(59,130,246,0.3);background:rgba(59,130,246,0.1);color:#60a5fa;cursor:pointer;">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21.5 2v6h-6M21.34 15.57a10 10 0 1 1-.57-8.38l5.67-5.67"/></svg>
+                Check for Updates
+              </button>
+            </div>
+            <div id="self-update-status" style="margin-top:12px;padding:12px;background:rgba(0,0,0,0.25);border-radius:8px;font-size:12px;display:none;"></div>
           </div>
         </div>
 
@@ -1328,6 +1344,68 @@
         document.getElementById('cfg-excluded').value = (data.excluded_packages || []).join(', ');
         document.getElementById('cfg-path-txt').innerText = data.config_path;
         document.getElementById('db-path-txt').innerText = data.db_path;
+
+        const btnCheckApp = document.getElementById('btn-check-app-update');
+        if (btnCheckApp && !btnCheckApp._wired) {
+          btnCheckApp._wired = true;
+          btnCheckApp.addEventListener('click', async () => {
+            const statusDiv = document.getElementById('self-update-status');
+            statusDiv.style.display = 'block';
+            statusDiv.innerHTML = '<div style="display:flex;align-items:center;gap:8px;color:#94a3b8;"><div class="spinner" style="display:inline-block;vertical-align:middle;"></div> Checking GitHub releases...</div>';
+            btnCheckApp.disabled = true;
+            try {
+              const resp = await fetch('/api/check_self_update');
+              const data = await resp.json();
+              if (!data.success) {
+                statusDiv.innerHTML = `<span style="color:#f87171;">⚠️ ${escapeHtml(data.error || 'Failed to check updates')}</span>`;
+                return;
+              }
+              if (data.update_available) {
+                statusDiv.innerHTML = `
+                  <div style="display:flex;flex-direction:column;gap:8px;">
+                    <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;">
+                      <span style="color:#facc15;font-weight:600;font-size:13px;">★ Update Available: ${escapeHtml(data.tag_name)} (Current: v${escapeHtml(data.current_version)})</span>
+                      ${data.download_url ? `<button class="btn-update-all" id="btn-apply-self-update" style="padding:6px 14px;font-size:12px;">Upgrade Now</button>` : ''}
+                    </div>
+                    <div style="color:#cbd5e1;font-size:12px;">${escapeHtml(data.release_name || '')}</div>
+                    <div><a href="${escapeHtml(data.release_url)}" target="_blank" style="color:#60a5fa;text-decoration:underline;">View Release Notes on GitHub</a></div>
+                  </div>
+                `;
+                const applyBtn = document.getElementById('btn-apply-self-update');
+                if (applyBtn) {
+                  applyBtn.addEventListener('click', () => {
+                    showModal('Upgrade ULUM', `Download and install ULUM ${escapeHtml(data.tag_name)} now?`, null, async () => {
+                      applyBtn.disabled = true;
+                      applyBtn.innerText = 'Installing...';
+                      statusDiv.innerHTML = '<div style="display:flex;align-items:center;gap:8px;color:#38bdf8;"><div class="spinner" style="display:inline-block;vertical-align:middle;"></div> Downloading and installing updated package...</div>';
+                      try {
+                        const instRes = await fetch('/api/install_self_update', {
+                          method: 'POST',
+                          headers: {'Content-Type': 'application/json'},
+                          body: JSON.stringify({ download_url: data.download_url })
+                        });
+                        const instData = await instRes.json();
+                        if (instData.success) {
+                          statusDiv.innerHTML = `<span style="color:#10b981;font-weight:600;">✓ ULUM successfully upgraded to ${escapeHtml(data.tag_name)}! Please restart the application.</span>`;
+                        } else {
+                          statusDiv.innerHTML = `<span style="color:#f87171;">Upgrade failed: ${escapeHtml(instData.error || 'Unknown error')}</span>`;
+                        }
+                      } catch (e) {
+                        statusDiv.innerHTML = `<span style="color:#f87171;">Installation error: ${escapeHtml(e)}</span>`;
+                      }
+                    });
+                  });
+                }
+              } else {
+                statusDiv.innerHTML = `<span style="color:#10b981;font-weight:600;">✓ ULUM is up to date (v${escapeHtml(data.current_version)}). You are running the latest version!</span>`;
+              }
+            } catch (e) {
+              statusDiv.innerHTML = `<span style="color:#f87171;">Error checking updates: ${escapeHtml(e)}</span>`;
+            } finally {
+              btnCheckApp.disabled = false;
+            }
+          });
+        }
       } catch (e) {
         console.error('Failed loading settings:', e);
       }
@@ -1361,6 +1439,42 @@
       const search = document.getElementById('table-search-input').value.toLowerCase().trim();
 
       if (currentTab === 'leftovers') {
+        const btnSec = document.getElementById('btn-secondary-action');
+        btnSec.style.display = 'block';
+        btnSec.innerText = 'Clean Old Kernels';
+        btnSec.onclick = async () => {
+          try {
+            const kRes = await fetch('/api/cleanup/kernels');
+            const kData = await kRes.json();
+            if (!kData.packages_to_remove || kData.packages_to_remove.length === 0) {
+              showModal('Kernel Health', `System /boot is clean.\nRunning kernel (${escapeHtml(kData.running_kernel)}) and fallback are protected. No obsolete kernels found.`, null, () => {});
+            } else {
+              showModal(
+                'Purge Obsolete Kernels',
+                `Found ${kData.packages_to_remove.length} obsolete kernel package(s) freeing ~${escapeHtml(kData.formatted_freed)}.\n\nRunning kernel ${escapeHtml(kData.running_kernel)} is protected.`,
+                kData.packages_to_remove.join(', '),
+                async () => {
+                  const res = await fetch('/api/cleanup/kernels', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({ dry_run: false })
+                  });
+                  const resData = await res.json();
+                  if (resData.success) {
+                    alert(`✓ Successfully purged old kernels and freed ~${resData.formatted_freed}!`);
+                  } else {
+                    alert(`Kernel purge failed: ${resData.error || 'Unknown error'}`);
+                  }
+                  await loadStats();
+                  await renderTable();
+                }
+              );
+            }
+          } catch (e) {
+            alert('Error scanning kernels: ' + e);
+          }
+        };
+
         thead.innerHTML = `
           <tr>
             <th>Residual Path</th>
@@ -1371,6 +1485,7 @@
             <th>Action</th>
           </tr>
         `;
+        document.getElementById('badge-download-size').style.display = 'none';
         document.getElementById('btn-update-all').innerText = 'Clean Verified Leftovers';
         document.getElementById('btn-update-all').onclick = () => {
           showModal('Clean Verified Leftovers', 'Permanently delete verified residual files?', null, async () => {
@@ -1447,6 +1562,26 @@
       }
 
       if (currentTab === 'diagnostics') {
+        const btnSec = document.getElementById('btn-secondary-action');
+        btnSec.style.display = 'block';
+        btnSec.innerText = 'Fix 404 Repos';
+        btnSec.onclick = () => {
+          showModal('Diagnose & Fix Broken Repositories', 'Scan for and safely disable 404 or broken repository entries in /etc/apt/sources.list.d/?', null, async () => {
+            try {
+              const res = await fetch('/api/doctor/fix_repos', { method: 'POST', body: '{}' });
+              const data = await res.json();
+              if (data.found_count === 0) {
+                alert('✓ All APT repositories are healthy! No 404 errors found.');
+              } else {
+                alert(`✓ Successfully disabled ${data.disabled_count} broken/404 repository entries.`);
+              }
+            } catch (e) {
+              alert('Error repairing repositories: ' + e);
+            }
+          });
+        };
+        document.getElementById('badge-download-size').style.display = 'none';
+
         thead.innerHTML = `
           <tr>
             <th>Component</th>
@@ -1482,6 +1617,58 @@
           <th>Action</th>
         </tr>
       `;
+
+      const btnSec = document.getElementById('btn-secondary-action');
+      const badgeDl = document.getElementById('badge-download-size');
+
+      if (currentTab === 'installed') {
+        btnSec.style.display = 'block';
+        btnSec.innerText = 'Integrate AppImages';
+        btnSec.onclick = () => {
+          showModal('Integrate AppImages', 'Scan ~/Downloads and ~/Applications to register standalone AppImages in your desktop menu?', null, async () => {
+            try {
+              const res = await fetch('/api/appimage/integrate', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({ all: true })
+              });
+              const data = await res.json();
+              alert(`✓ Successfully integrated ${data.results ? data.results.length : 0} AppImage(s) into your desktop launcher.`);
+              await loadStats();
+              await loadData();
+            } catch (e) {
+              alert('Integration error: ' + e);
+            }
+          });
+        };
+        badgeDl.style.display = 'none';
+      } else {
+        btnSec.style.display = 'none';
+        // Check download size for pending updates
+        if (allUpdates.length > 0) {
+          fetch('/api/download_size').then(r => r.json()).then(dlData => {
+            if (dlData.total_bytes > 0) {
+              badgeDl.style.display = 'inline-flex';
+              if (dlData.is_large_download) {
+                badgeDl.style.background = 'rgba(234, 179, 8, 0.15)';
+                badgeDl.style.border = '1px solid rgba(234, 179, 8, 0.4)';
+                badgeDl.style.color = '#facc15';
+                badgeDl.innerText = `⚠️ ~${dlData.formatted_size} (Metered Caution)`;
+              } else {
+                badgeDl.style.background = 'rgba(59, 130, 246, 0.12)';
+                badgeDl.style.border = '1px solid rgba(59, 130, 246, 0.3)';
+                badgeDl.style.color = '#93c5fd';
+                badgeDl.innerText = `📦 Est. Download: ~${dlData.formatted_size}`;
+              }
+            } else {
+              badgeDl.style.display = 'none';
+            }
+          }).catch(() => { badgeDl.style.display = 'none'; });
+        } else {
+          badgeDl.style.display = 'none';
+        }
+      }
+
       document.getElementById('btn-update-all').style.display = 'block';
       document.getElementById('btn-update-all').innerText = `Update All (${allUpdates.length})`;
       document.getElementById('btn-update-all').onclick = () => {

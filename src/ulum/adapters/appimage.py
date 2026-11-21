@@ -1,7 +1,10 @@
 import os
 import re
+import shutil
+import stat
+import subprocess
 from pathlib import Path
-from typing import Dict, List, Optional, Sequence
+from typing import Any, Dict, List, Optional, Sequence, Tuple
 from ulum.adapters.base import BaseAdapter
 from ulum.core.models import (
     ApplicationRecord,
@@ -188,3 +191,111 @@ class AppImageAdapter(BaseAdapter):
             if app.package_id.lower() == package_id.lower():
                 return True
         return False
+
+    @classmethod
+    def get_desktop_dir(cls) -> Path:
+        return Path.home() / ".local" / "share" / "applications"
+
+    @classmethod
+    def integrate_appimage(cls, appimage_path: Path) -> Tuple[bool, str, Optional[Path]]:
+        """Makes AppImage executable, creates an XDG .desktop launcher, and registers with desktop menu."""
+        p = Path(appimage_path).expanduser().resolve()
+        if not p.is_file():
+            return False, f"File not found: {p}", None
+
+        # Ensure executable permissions
+        try:
+            current_mode = p.stat().st_mode
+            p.chmod(current_mode | stat.S_IXUSR | stat.S_IXGRP | stat.S_IXOTH)
+        except Exception as e:
+            return False, f"Could not set execute permission on {p.name}: {e}", None
+
+        desktop_dir = cls.get_desktop_dir()
+        desktop_dir.mkdir(parents=True, exist_ok=True)
+
+        app_id = p.stem.lower()
+        desktop_file = desktop_dir / f"appimage-{app_id}.desktop"
+
+        display_name = re.sub(r"[-_]\d+\.\d+.*", "", p.stem).replace("-", " ").title() or app_id
+
+        # Write clean standard .desktop file
+        content = f"""[Desktop Entry]
+Type=Application
+Name={display_name}
+Exec="{p}" %U
+Icon=application-x-executable
+Terminal=false
+Categories=Utility;Application;
+Comment=Integrated by ULUM
+X-AppImage-Version={p.stem}
+"""
+        try:
+            desktop_file.write_text(content, encoding="utf-8")
+        except Exception as e:
+            return False, f"Failed writing desktop file: {e}", None
+
+        # Update desktop database if utility exists
+        if shutil.which("update-desktop-database"):
+            try:
+                subprocess.run(
+                    ["update-desktop-database", str(desktop_dir)],
+                    stdout=subprocess.DEVNULL,
+                    stderr=subprocess.DEVNULL,
+                    check=False,
+                )
+            except Exception:
+                pass
+
+        return True, f"Successfully integrated '{display_name}' into desktop menu.", desktop_file
+
+    @classmethod
+    def find_unintegrated_appimages(cls) -> List[Path]:
+        """Finds standalone AppImages in common directories that lack a desktop launcher."""
+        home = Path.home()
+        search_dirs = [
+            home / "Downloads",
+            home / "Applications",
+            home / ".local" / "bin",
+            home / "bin",
+        ]
+        desktop_dir = cls.get_desktop_dir()
+        existing_execs = set()
+
+        if desktop_dir.exists():
+            for d in desktop_dir.glob("*.desktop"):
+                try:
+                    for line in d.read_text(encoding="utf-8", errors="ignore").splitlines():
+                        if line.startswith("Exec="):
+                            raw = line.split("Exec=", 1)[1].strip().split()[0].strip("\"'")
+                            existing_execs.add(str(Path(raw).expanduser().resolve()))
+                except Exception:
+                    pass
+
+        unintegrated: List[Path] = []
+        for sdir in search_dirs:
+            if sdir.exists():
+                try:
+                    for cand in sdir.iterdir():
+                        if cand.is_file() and cand.name.lower().endswith(".appimage"):
+                            resolved = cand.resolve()
+                            if str(resolved) not in existing_execs:
+                                unintegrated.append(resolved)
+                except Exception:
+                    pass
+        return sorted(list(set(unintegrated)))
+
+    @classmethod
+    def integrate_all_unintegrated(cls) -> List[Dict[str, Any]]:
+        """Scans and integrates all unintegrated AppImages."""
+        cands = cls.find_unintegrated_appimages()
+        results = []
+        for cand in cands:
+            ok, msg, dfile = cls.integrate_appimage(cand)
+            results.append({
+                "path": str(cand),
+                "name": cand.name,
+                "success": ok,
+                "message": msg,
+                "desktop_file": str(dfile) if dfile else None,
+            })
+        return results

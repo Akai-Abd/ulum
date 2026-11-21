@@ -7,6 +7,39 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [0.3.0] - 2026-11-21
+
+### 🚀 Major Feature Release: System Health, /boot Protection, AppImage Integration & In-App Self-Updates
+
+- **🏥 Broken PPA & 404 Repository Auto-Repair (`ulum doctor --fix-repos` / GUI)**:
+  - Added automated detection of dead, expired, or 404 repositories in `/etc/apt/sources.list` and `/etc/apt/sources.list.d/*.list` / `*.sources`.
+  - Implemented safe in-place commenting of failing source lines (`# DISABLED BY ULUM (404/broken): ...`), restoring standard `apt-get update` functionality without manual terminal editing.
+  - Added "Fix 404 Repos" action button in the GUI Diagnostics view and `--fix-repos` flag to the `ulum doctor` CLI command.
+
+- **🧹 Obsolete Linux Kernel & `/boot` Partition Saver (`ulum cleanup --kernels` / GUI)**:
+  - Added intelligent kernel cleanup that safeguards the active booted kernel (`uname -r`) and the newest fallback kernel, while safely identifying older orphaned kernels and residual `config-files`.
+  - Accurately computes disk space savings across image, module, and header packages.
+  - Implemented strict safety guards refusing deletion of any package matching the running kernel.
+  - Added "Clean Old Kernels" action in the GUI Leftovers/Cleanup view and `--kernels` (`-k`) flag to the `ulum cleanup` CLI command.
+
+- **📦 Standalone AppImage Desktop Integrator (`ulum integrate` / GUI)**:
+  - Added automatic XDG desktop launcher generation in `~/.local/share/applications/*.desktop` for standalone AppImages discovered in `~/Downloads`, `~/Applications`, and `~/.local/bin`.
+  - Automatically ensures executable permissions (`chmod +x`), generates clean `.desktop` metadata, and calls `update-desktop-database` to immediately display AppImages in desktop start menus and application launchers.
+  - Added "Integrate AppImages" action button in the GUI Installed Applications view and new `ulum integrate` CLI command.
+
+- **📶 Download Size Estimator & Metered Connection Warning (`ulum check` / `ulum update` / GUI)**:
+  - Added pre-upgrade download size calculation for APT (`apt-get -s dist-upgrade`) and Flatpak (`flatpak remote-ls --columns=download-size`).
+  - Added automatic metered connection warning badge (`⚠️ Large Download (> 1 GB)`) in the desktop dashboard and confirmation dialogs before initiating bulk updates.
+  - Displays download breakdown and warnings in CLI `ulum check` and `ulum update`.
+
+- **🔄 In-App Self-Update Checker in Settings Dashboard (`ulum self-update` / GUI)**:
+  - Added dedicated "ULUM Application Updates" card in the GUI Settings Dashboard with a "Check for Updates" button (`#btn-check-app-update`).
+  - Queries GitHub Releases API with automated version comparison and changelog preview.
+  - Provides a one-click "Upgrade Now" action that downloads the latest `.deb` package and upgrades ULUM directly in-app.
+  - Added `ulum self-update` and `ulum self-update --check` CLI commands.
+
+---
+
 ## [0.2.2] - 2026-11-20
 
 ### 🛡️ Production Hardening & Full Audit Remediation

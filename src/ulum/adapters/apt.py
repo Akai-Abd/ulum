@@ -184,3 +184,22 @@ class AptAdapter(BaseAdapter):
     def verify_state(self, package_id: str) -> bool:
         res = run_cmd(["dpkg-query", "-W", "-f=${Status}", package_id])
         return res.returncode == 0 and "install ok installed" in res.stdout
+
+    def get_download_size(self) -> int:
+        """Estimates total download size in bytes for pending upgrades."""
+        if not self.is_available():
+            return 0
+        res = run_cmd(["apt-get", "-s", "dist-upgrade"])
+        ret = getattr(res, "returncode", getattr(res, "exit_code", 0))
+        if ret != 0 or not getattr(res, "stdout", None):
+            return 0
+        m = re.search(r"Need to get\s+([\d.,]+)\s*([kKMGT]?B)", res.stdout, re.IGNORECASE)
+        if not m:
+            return 0
+        num_str = m.group(1).replace(",", "")
+        unit = m.group(2).upper()
+        multipliers = {"B": 1, "KB": 1024, "MB": 1024**2, "GB": 1024**3, "TB": 1024**4}
+        try:
+            return int(float(num_str) * multipliers.get(unit, 1))
+        except ValueError:
+            return 0

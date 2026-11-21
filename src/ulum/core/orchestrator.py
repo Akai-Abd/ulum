@@ -1,5 +1,5 @@
 import datetime
-from typing import Dict, List, Optional, Tuple
+from typing import Any, Dict, List, Optional, Tuple
 from ulum.adapters.apt import AptAdapter
 from ulum.adapters.appimage import AppImageAdapter
 from ulum.adapters.base import BaseAdapter
@@ -65,6 +65,35 @@ class Orchestrator:
 
         self.repo.save_updates(all_updates, clear_previous=(source is None))
         return all_updates
+
+    def get_update_download_summary(self) -> Dict[str, Any]:
+        """Calculates total estimated download size and flags metered connection cautions."""
+        from ulum.cli.display import format_bytes
+        total_bytes = 0
+        breakdown: Dict[str, Dict[str, Any]] = {}
+        for name, adapter in self.get_available_adapters().items():
+            if hasattr(adapter, "get_download_size"):
+                try:
+                    sz = adapter.get_download_size()
+                except Exception:
+                    sz = 0
+                total_bytes += sz
+                breakdown[name] = {"bytes": sz, "formatted": format_bytes(sz)}
+            else:
+                breakdown[name] = {"bytes": 0, "formatted": "0 B"}
+
+        is_large = total_bytes > (1024 * 1024 * 1024)  # > 1 GB
+        warning_msg = (
+            f"Notice: Large download ({format_bytes(total_bytes)}) detected. Metered connection caution."
+            if is_large else None
+        )
+        return {
+            "total_bytes": total_bytes,
+            "formatted_size": format_bytes(total_bytes),
+            "is_large_download": is_large,
+            "warning": warning_msg,
+            "breakdown": breakdown,
+        }
 
     def execute_updates(
         self,

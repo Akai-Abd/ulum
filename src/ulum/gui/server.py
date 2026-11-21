@@ -14,9 +14,13 @@ from ulum.core.orchestrator import Orchestrator
 from ulum.core.system import detect_package_managers, get_system_info
 from ulum.db.database import get_db_path
 from ulum.db.repository import Repository
+from ulum.adapters.appimage import AppImageAdapter
+from ulum.doctor.repos import AptRepoDoctor
+from ulum.removal.kernels import KernelCleaner
 from ulum.removal.leftovers import LeftoverScanner
 from ulum.removal.safety import SafetyValidator
 from ulum.utils.logging import logger
+from ulum.utils.self_update import SelfUpdater
 
 WEB_DIR = Path(__file__).parent / "web"
 
@@ -197,6 +201,31 @@ class UlumApiHandler(http.server.BaseHTTPRequestHandler):
             self.send_json(CURRENT_OPERATION)
             return
 
+        if path == "/api/download_size":
+            summary = self.orchestrator.get_update_download_summary()
+            self.send_json(summary)
+            return
+
+        if path == "/api/cleanup/kernels":
+            plan = KernelCleaner.plan_cleanup()
+            self.send_json(plan)
+            return
+
+        if path == "/api/doctor/repos":
+            entries, _ = AptRepoDoctor.check_broken_sources()
+            self.send_json({"broken_count": len(entries), "entries": entries})
+            return
+
+        if path == "/api/appimage/unintegrated":
+            cands = AppImageAdapter.find_unintegrated_appimages()
+            self.send_json({"unintegrated": [str(c) for c in cands], "count": len(cands)})
+            return
+
+        if path == "/api/check_self_update":
+            res = SelfUpdater.check_latest_release(timeout=5)
+            self.send_json(res)
+            return
+
         self.send_error(404, "Endpoint not found")
 
     def do_POST(self) -> None:
@@ -344,6 +373,52 @@ class UlumApiHandler(http.server.BaseHTTPRequestHandler):
             self.config.require_confirmation = req_confirm
             self.config.log_level = log_lvl
             self.send_json({"success": True})
+            return
+
+        if path == "/api/cleanup/kernels":
+            dry_run = payload.get("dry_run", False)
+            plan = KernelCleaner.plan_cleanup()
+            res = KernelCleaner.execute_cleanup(plan, dry_run=dry_run)
+            self.send_json({
+                "success": res.success,
+                "exit_code": res.exit_code,
+                "freed_bytes": plan.get("estimated_freed_bytes", 0),
+                "formatted_freed": plan.get("formatted_freed", "0 B"),
+                "removed_items": res.removed_items,
+                "error": res.error_summary,
+            })
+            return
+
+        if path == "/api/doctor/fix_repos":
+            dry_run = payload.get("dry_run", False)
+            res = AptRepoDoctor.fix_all_broken(dry_run=dry_run)
+            self.send_json(res)
+            return
+
+        if path == "/api/appimage/integrate":
+            integrate_all = payload.get("all", False)
+            target_path = payload.get("path")
+            if integrate_all:
+                results = AppImageAdapter.integrate_all_unintegrated()
+                self.send_json({"success": True, "results": results})
+            elif target_path:
+                ok, msg, dfile = AppImageAdapter.integrate_appimage(Path(target_path))
+                self.send_json({"success": ok, "message": msg, "desktop_file": str(dfile) if dfile else None})
+            else:
+                self.send_json({"success": False, "error": "Missing path or all parameter"}, status=400)
+            return
+
+        if path == "/api/install_self_update":
+            download_url = payload.get("download_url")
+            if not download_url:
+                self.send_json({"success": False, "error": "Missing download_url"}, status=400)
+                return
+            res = SelfUpdater.apply_update(download_url)
+            self.send_json({
+                "success": res.success,
+                "exit_code": res.exit_code,
+                "error": res.error_summary,
+            })
             return
 
         self.send_error(404, "Endpoint not found")

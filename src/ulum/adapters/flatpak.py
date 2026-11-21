@@ -1,3 +1,4 @@
+import re
 from pathlib import Path
 from typing import Dict, List, Optional, Sequence
 from ulum.adapters.base import BaseAdapter
@@ -145,3 +146,25 @@ class FlatpakAdapter(BaseAdapter):
     def verify_state(self, package_id: str) -> bool:
         res = run_cmd(["flatpak", "info", package_id])
         return res.returncode == 0
+
+    def get_download_size(self) -> int:
+        """Estimates total download size in bytes for pending updates."""
+        if not self.is_available():
+            return 0
+        res = run_cmd(["flatpak", "remote-ls", "--updates", "--columns=download-size"])
+        ret = getattr(res, "returncode", getattr(res, "exit_code", 0))
+        if ret != 0 or not getattr(res, "stdout", None):
+            return 0
+        total_bytes = 0
+        multipliers = {"B": 1, "KB": 1024, "MB": 1024**2, "GB": 1024**3, "TB": 1024**4}
+        for line in res.stdout.splitlines():
+            line = line.strip()
+            m = re.search(r"([\d.,]+)\s*([kKMGT]?B)", line, re.IGNORECASE)
+            if m:
+                num_str = m.group(1).replace(",", "")
+                unit = m.group(2).upper()
+                try:
+                    total_bytes += int(float(num_str) * multipliers.get(unit, 1))
+                except ValueError:
+                    pass
+        return total_bytes

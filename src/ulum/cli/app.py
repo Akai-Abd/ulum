@@ -18,8 +18,12 @@ from ulum.core.orchestrator import Orchestrator
 from ulum.core.system import detect_package_managers, get_system_info
 from ulum.db.database import get_db_path, init_db
 from ulum.db.repository import Repository
+from ulum.doctor.repos import AptRepoDoctor
+from ulum.removal.kernels import KernelCleaner
+from ulum.adapters.appimage import AppImageAdapter
 from ulum.removal.leftovers import LeftoverScanner
 from ulum.removal.safety import SafetyValidator
+from ulum.utils.self_update import SelfUpdater
 
 app = typer.Typer(
     name="ulum",
@@ -81,6 +85,12 @@ def check_cmd(
     with console.status("[bold cyan]Checking for available updates...[/bold cyan]"):
         updates = orc.check_updates(refresh=refresh, source=source)
     print_updates_table(updates)
+    if updates:
+        dl_summary = orc.get_update_download_summary()
+        if dl_summary["total_bytes"] > 0:
+            console.print(f"  • [cyan]Estimated Download Size:[/cyan] [bold]{dl_summary['formatted_size']}[/bold]")
+            if dl_summary["is_large_download"]:
+                console.print(f"    [bold yellow]⚠️ {dl_summary['warning']}[/bold yellow]")
 
 @app.command("list")
 def list_cmd(
@@ -154,6 +164,10 @@ def update_cmd(
     if dry_run:
         console.print("[bold yellow]Running in DRY-RUN mode. No changes will be made.[/bold yellow]")
 
+    dl_summary = orc.get_update_download_summary()
+    if dl_summary["is_large_download"]:
+        console.print(f"[bold yellow]⚠️ Metered Connection Warning:[/bold yellow] Large download of {dl_summary['formatted_size']} required.")
+
     if not yes and not dry_run:
         target_desc = identifier or (f"all {source} packages" if source else "ALL eligible packages")
         if not Confirm.ask(f"Proceed with updating {target_desc}?"):
@@ -221,10 +235,37 @@ def leftovers_cmd():
 
 @app.command("cleanup")
 def cleanup_cmd(
-    yes: bool = typer.Option(False, "--yes", "-y", help="Skip confirmation for verified leftovers"),
+    yes: bool = typer.Option(False, "--yes", "-y", help="Skip confirmation for verified leftovers or kernels"),
+    kernels: bool = typer.Option(False, "--kernels", "-k", help="Purge obsolete Linux kernels and free /boot partition space"),
+    dry_run: bool = typer.Option(False, "--dry-run", "-n", help="Simulate cleanup without modifying the system"),
 ):
-    """Review and remove verified residual leftover files."""
+    """Review and remove verified residual leftover files or obsolete Linux kernels."""
     orc = get_orchestrator()
+    if kernels:
+        console.print("[bold cyan]Scanning for obsolete Linux kernels...[/bold cyan]")
+        plan = KernelCleaner.plan_cleanup()
+        console.print(f"  • Running Kernel: [bold green]{plan['running_kernel']}[/bold green] (Protected)")
+        console.print(f"  • Kept Kernels: [green]{', '.join(plan['kept_kernels'])}[/green]")
+        if not plan["packages_to_remove"]:
+            console.print("[green]✓ System is clean. No obsolete kernels found.[/green]")
+            return
+        console.print(f"  • Obsolete Packages to Purge ({len(plan['packages_to_remove'])}): [red]{', '.join(plan['packages_to_remove'])}[/red]")
+        console.print(f"  • Estimated Freed Disk Space: [bold green]{plan['formatted_freed']}[/bold green]")
+        if dry_run:
+            console.print("[bold yellow]Dry-run mode: No packages were purged.[/bold yellow]")
+            return
+        if not yes:
+            if not Confirm.ask(f"Purge these {len(plan['packages_to_remove'])} obsolete kernel packages?"):
+                console.print("[dim]Kernel cleanup cancelled.[/dim]")
+                return
+        with console.status("[bold red]Purging obsolete kernel packages...[/bold red]"):
+            res = KernelCleaner.execute_cleanup(plan, dry_run=False)
+        if res.success:
+            console.print(f"[bold green]✓ Successfully cleaned old kernels. Freed ~{plan['formatted_freed']}.[/bold green]")
+        else:
+            console.print(f"[bold red]✗ Kernel purge failed:[/bold red] {res.error_summary or res.stderr}")
+        return
+
     candidates = orc.repo.get_cleanup_candidates(confidence="verified")
     if not candidates:
         console.print("[green]✓ No verified leftovers pending cleanup.[/green]")
@@ -300,6 +341,7 @@ def removal_history_cmd(limit: int = typer.Option(20, "--limit", "-l", help="Num
 @app.command("doctor")
 def doctor_cmd(
     fix: bool = typer.Option(False, "--fix", "-f", help="Attempt automatic repair of interrupted dpkg/apt locks and state"),
+    fix_repos: bool = typer.Option(False, "--fix-repos", help="Scan for and disable broken or 404 APT repositories"),
 ):
     """Diagnose system compatibility, package managers, and database health."""
     console.print("[bold cyan]Running ULUM Health Diagnostics...[/bold cyan]\n")
@@ -320,20 +362,31 @@ def doctor_cmd(
     sudo_ok = is_root() or command_exists("sudo")
     console.print(f"Privilege Escalation (sudo/root): {'[green]OK[/green]' if sudo_ok else '[red]Missing sudo[/red]'}")
 
-    if fix:
-        console.print("\n[bold yellow]Attempting automated package manager recovery...[/bold yellow]")
-        from ulum.utils.process import command_exists, run_cmd
-        if command_exists("dpkg") and command_exists("apt-get"):
-            try:
-                console.print("  • Configuring pending packages (dpkg --configure -a)...")
-                run_cmd(["dpkg", "--configure", "-a"], require_root=True)
-                console.print("  • Resolving broken dependencies (apt-get install -f)...")
-                run_cmd(["apt-get", "install", "-f", "-y"], require_root=True)
-                console.print("[bold green]✓ Automated recovery tasks completed successfully.[/bold green]")
-            except Exception as e:
-                console.print(f"[bold red]Recovery encountered an error:[/bold red] {e}")
-        else:
-            console.print("[yellow]Automated recovery is currently only available for Debian/Ubuntu (APT) systems.[/yellow]")
+    if fix or fix_repos:
+        if fix_repos:
+            console.print("\n[bold yellow]Diagnosing APT repository health (detecting 404s/broken keys)...[/bold yellow]")
+            repo_res = AptRepoDoctor.fix_all_broken(dry_run=False)
+            if repo_res["found_count"] == 0:
+                console.print("[green]✓ All APT repositories are healthy (no 404 errors detected).[/green]")
+            else:
+                console.print(f"[bold green]✓ Disabled {repo_res['disabled_count']} broken/404 repository entry(s):[/bold green]")
+                for d in repo_res["disabled_entries"]:
+                    console.print(f"  • Disabled in [cyan]{Path(d['file']).name}:{d['line_number']}[/cyan] ({d['reason']})")
+
+        if fix:
+            console.print("\n[bold yellow]Attempting automated package manager recovery...[/bold yellow]")
+            from ulum.utils.process import command_exists, run_cmd
+            if command_exists("dpkg") and command_exists("apt-get"):
+                try:
+                    console.print("  • Configuring pending packages (dpkg --configure -a)...")
+                    run_cmd(["dpkg", "--configure", "-a"], require_root=True)
+                    console.print("  • Resolving broken dependencies (apt-get install -f)...")
+                    run_cmd(["apt-get", "install", "-f", "-y"], require_root=True)
+                    console.print("[bold green]✓ Automated recovery tasks completed successfully.[/bold green]")
+                except Exception as e:
+                    console.print(f"[bold red]Recovery encountered an error:[/bold red] {e}")
+            else:
+                console.print("[yellow]Automated recovery is currently only available for Debian/Ubuntu (APT) systems.[/yellow]")
 
     console.print("\n[bold green]✓ Diagnostic check complete.[/bold green]")
 
@@ -394,3 +447,82 @@ WantedBy=timers.target
     subprocess.run(["systemctl", "--user", "enable", "--now", "ulum-check.timer"], capture_output=True)
     console.print("[bold green]✓ Background update notification timer installed and activated.[/bold green]")
     console.print("ULUM will silently check daily and display a desktop notification when updates arrive.")
+
+@app.command("integrate")
+def integrate_cmd(
+    path: Optional[str] = typer.Argument(None, help="Path to AppImage file to integrate into desktop launcher"),
+    all_appimages: bool = typer.Option(False, "--all", "-a", help="Scan and integrate all unintegrated AppImages"),
+):
+    """Integrate standalone AppImage applications into desktop start menu and launcher."""
+    if path:
+        p = Path(path)
+        ok, msg, dfile = AppImageAdapter.integrate_appimage(p)
+        if ok:
+            console.print(f"[bold green]✓ {msg}[/bold green] (Created: {dfile})")
+        else:
+            console.print(f"[bold red]✗ Integration failed:[/bold red] {msg}")
+    elif all_appimages:
+        results = AppImageAdapter.integrate_all_unintegrated()
+        if not results:
+            console.print("[green]✓ No unintegrated AppImages found in ~/Downloads or ~/Applications.[/green]")
+        else:
+            console.print(f"[bold green]✓ Integrated {len(results)} AppImage(s):[/bold green]")
+            for r in results:
+                status = "[green]✓[/green]" if r["success"] else "[red]✗[/red]"
+                console.print(f"  {status} {r['name']}: {r['message']}")
+    else:
+        unintegrated = AppImageAdapter.find_unintegrated_appimages()
+        if not unintegrated:
+            console.print("[green]✓ All detected AppImages are already integrated into desktop launcher.[/green]")
+        else:
+            console.print(f"[yellow]Found {len(unintegrated)} unintegrated AppImage(s):[/yellow]")
+            for u in unintegrated:
+                console.print(f"  • {u}")
+            console.print("\nRun [bold]ulum integrate --all[/bold] to integrate all into your application menu.")
+
+@app.command("self-update")
+def self_update_cmd(
+    check: bool = typer.Option(False, "--check", "-c", help="Only check for updates without installing"),
+    yes: bool = typer.Option(False, "--yes", "-y", help="Skip confirmation when installing update"),
+):
+    """Check for new ULUM releases on GitHub and apply updates."""
+    with console.status("[bold cyan]Checking GitHub for ULUM updates...[/bold cyan]"):
+        res = SelfUpdater.check_latest_release()
+
+    if not res.get("success"):
+        console.print(f"[bold red]Could not check for updates:[/bold red] {res.get('error')}")
+        return
+
+    console.print(f"Current ULUM Version: [bold cyan]v{res['current_version']}[/bold cyan]")
+    console.print(f"Latest Online Release: [bold green]{res['tag_name']}[/bold green]")
+
+    if not res.get("update_available"):
+        console.print("[bold green]✓ ULUM is up to date! You are on the latest release.[/bold green]")
+        return
+
+    console.print(f"\n[bold yellow]★ New Version Available: {res['tag_name']}[/bold yellow]")
+    if res.get("deb_filename"):
+        console.print(f"Package: [cyan]{res['deb_filename']}[/cyan]")
+    if res.get("release_url"):
+        console.print(f"Release URL: {res['release_url']}")
+
+    if check:
+        return
+
+    deb_url = res.get("download_url")
+    if not deb_url:
+        console.print("[yellow]No .deb package asset found for automated installation. Please visit the release URL.[/yellow]")
+        return
+
+    if not yes:
+        if not Confirm.ask(f"Download and upgrade ULUM to {res['tag_name']} now?"):
+            console.print("[dim]Update cancelled.[/dim]")
+            return
+
+    with console.status(f"[bold green]Downloading and installing ULUM {res['tag_name']}...[/bold green]"):
+        install_res = SelfUpdater.apply_update(deb_url)
+
+    if install_res.success:
+        console.print(f"[bold green]✓ Successfully upgraded ULUM to {res['tag_name']}![/bold green]")
+    else:
+        console.print(f"[bold red]✗ Upgrade failed:[/bold red] {install_res.error_summary or install_res.stderr}")
