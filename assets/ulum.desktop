@@ -2,7 +2,7 @@
 Name=Universal Linux Update Manager
 GenericName=Update Manager
 Comment=Orchestrate updates and safe removals across APT, Flatpak, Snap, and AppImage
-Exec=ulum gui
+Exec=ulum-gui
 Icon=ulum
 Terminal=false
 Type=Application

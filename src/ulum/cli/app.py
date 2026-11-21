@@ -35,7 +35,13 @@ def get_orchestrator() -> Orchestrator:
 
 @app.command("gui")
 def gui_cmd():
-    """Launch the graphical user interface."""
+    """Launch the graphical user interface as root."""
+    import os
+    import shutil
+    if os.geteuid() != 0 and shutil.which("pkexec"):
+        gui_bin = shutil.which("ulum-gui")
+        if gui_bin:
+            os.execvp("pkexec", ["pkexec", gui_bin])
     from ulum.gui.window import run_gui
     run_gui()
 
@@ -134,7 +140,6 @@ def update_cmd(
     all_packages: bool = typer.Option(False, "--all", "-a", help="Update all eligible packages across all sources"),
     source: Optional[str] = typer.Option(None, "--source", "-s", help="Update all packages for a specific source"),
     dry_run: bool = typer.Option(False, "--dry-run", "-n", help="Simulate update without modifying the system"),
-    snapshot: bool = typer.Option(False, "--snapshot", "-S", help="Create a Timeshift/Snapper system snapshot before updating"),
     yes: bool = typer.Option(False, "--yes", "-y", help="Skip interactive confirmation"),
 ):
     """Update a specific application, a single source, or all eligible software."""
@@ -155,7 +160,7 @@ def update_cmd(
             console.print("[dim]Update cancelled by user.[/dim]")
             raise typer.Exit(code=0)
 
-    results = orc.execute_updates(targets=targets, source=source, dry_run=dry_run, create_snapshot=snapshot)
+    results = orc.execute_updates(targets=targets, source=source, dry_run=dry_run)
     for src, res in results:
         if res.success:
             console.print(f"[bold green]✓ {src.upper()} update succeeded.[/bold green]")

@@ -237,7 +237,6 @@ class UlumApiHandler(http.server.BaseHTTPRequestHandler):
             identifier = payload.get("identifier")
             all_pkgs = payload.get("all", False)
             source = payload.get("source")
-            snapshot = bool(payload.get("snapshot", False))
             targets = [identifier] if identifier else None
 
             CURRENT_OPERATION["running"] = True
@@ -246,7 +245,7 @@ class UlumApiHandler(http.server.BaseHTTPRequestHandler):
 
             try:
                 results = self.orchestrator.execute_updates(
-                    targets=targets, source=source, dry_run=False, create_snapshot=snapshot
+                    targets=targets, source=source, dry_run=False
                 )
                 success = len(results) > 0 and all(r.success for _, r in results)
                 for src, res in results:

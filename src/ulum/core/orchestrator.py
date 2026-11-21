@@ -71,17 +71,7 @@ class Orchestrator:
         targets: Optional[List[str]] = None,
         source: Optional[str] = None,
         dry_run: bool = False,
-        create_snapshot: bool = False,
     ) -> List[Tuple[str, ExecutionResult]]:
-        if create_snapshot and not dry_run:
-            from ulum.core.system import create_system_snapshot
-            ok, msg = create_system_snapshot("Pre-update backup via ULUM")
-            logger.info("System snapshot status: %s (%s)", "Created" if ok else "Skipped/Failed", msg)
-            if not ok:
-                err = f"Pre-update snapshot failed: {msg}"
-                logger.error(err)
-                return [("system", ExecutionResult(success=False, exit_code=1, stderr=err, error_summary=err))]
-
         results: List[Tuple[str, ExecutionResult]] = []
         active_adapters = self.get_available_adapters()
 

@@ -1089,11 +1089,6 @@
       <h3 id="modal-title">Confirm Action</h3>
       <p id="modal-desc">Are you sure you want to proceed?</p>
       <div id="modal-details" style="font-size:12px;color:#cbd5e1;background:rgba(0,0,0,0.3);padding:10px;border-radius:8px;margin-bottom:12px;max-height:120px;overflow-y:auto;display:none;"></div>
-      <div id="modal-options" style="margin-bottom:12px;display:none;">
-        <label style="display:flex;align-items:center;gap:8px;font-size:12px;color:#94a3b8;cursor:pointer;">
-          <input type="checkbox" id="modal-chk-snapshot" checked> Create system snapshot (Timeshift/Snapper)
-        </label>
-      </div>
       <div class="modal-actions">
         <button class="btn-action-dark" id="modal-btn-cancel">Cancel</button>
         <button class="btn-update-all" id="modal-btn-confirm">Confirm</button>
@@ -1490,7 +1485,7 @@
       document.getElementById('btn-update-all').style.display = 'block';
       document.getElementById('btn-update-all').innerText = `Update All (${allUpdates.length})`;
       document.getElementById('btn-update-all').onclick = () => {
-        showModal('Update All Software', `Proceed with updating all ${allUpdates.length} eligible applications?`, null, async (snapshot) => {
+        showModal('Update All Software', `Proceed with updating all ${allUpdates.length} eligible applications?`, null, async () => {
           const btnAll = document.getElementById('btn-update-all');
           const origText = btnAll.innerText;
           btnAll.disabled = true;
@@ -1499,7 +1494,7 @@
             const res = await fetch('/api/update', {
               method: 'POST',
               headers: {'Content-Type': 'application/json'},
-              body: JSON.stringify({ all: true, snapshot: snapshot })
+              body: JSON.stringify({ all: true })
             });
             const data = await res.json();
             if (!data.success) {
@@ -1616,9 +1611,9 @@
     }
 
     // Modal Helper
-    function showModal(title, desc, details, onConfirm, showSnapshotOption = false) {
+    function showModal(title, desc, details, onConfirm) {
       if (!requireConfirmation) {
-        onConfirm(false);
+        onConfirm();
         return;
       }
       document.getElementById('modal-title').innerText = title;
@@ -1631,11 +1626,6 @@
         det.style.display = 'none';
       }
 
-      const opt = document.getElementById('modal-options');
-      if (opt) {
-        opt.style.display = showSnapshotOption ? 'block' : 'none';
-      }
-
       const modal = document.getElementById('confirm-modal');
       modal.classList.add('active');
 
@@ -1643,9 +1633,8 @@
       const btnCancel = document.getElementById('modal-btn-cancel');
 
       btnConfirm.onclick = () => {
-        const snapshot = showSnapshotOption ? (document.getElementById('modal-chk-snapshot')?.checked ?? false) : false;
         modal.classList.remove('active');
-        onConfirm(snapshot);
+        onConfirm();
       };
       btnCancel.onclick = () => {
         modal.classList.remove('active');
@@ -1654,7 +1643,7 @@
 
     // Actions
     window.handleUpdate = function(qualifiedId, btn) {
-      showModal('Update Application', `Proceed with updating ${qualifiedId}?`, null, async (snapshot) => {
+      showModal('Update Application', `Proceed with updating ${qualifiedId}?`, null, async () => {
         const origText = btn ? btn.innerHTML : '';
         if (btn) {
           btn.disabled = true;
@@ -1664,7 +1653,7 @@
           const res = await fetch('/api/update', {
             method: 'POST',
             headers: {'Content-Type': 'application/json'},
-            body: JSON.stringify({ identifier: qualifiedId, snapshot: snapshot })
+            body: JSON.stringify({ identifier: qualifiedId })
           });
           const data = await res.json();
           if (!data.success) {
