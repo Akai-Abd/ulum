@@ -21,6 +21,11 @@ Seamlessly orchestrate software updates and clean removals across **APT**, **Fla
 ## 🌟 Key Features
 
 - **Unified Multi-Source Updates**: Check and upgrade packages across system repositories (APT), sandboxed runtimes (Flatpak), containerized snaps (Snap), and standalone binaries (AppImage) in one command.
+- **Broken PPA & 404 Repo Auto-Fix**: Diagnoses dead or expired repositories in `/etc/apt/sources.list.d/` and comments them out safely (`ulum doctor --fix-repos` or 1-click in GUI Diagnostics).
+- **Obsolete Kernel & `/boot` Partition Saver**: Intelligently identifies and purges obsolete Linux kernels and residual config files while strictly guarding active booted (`uname -r`) and fallback kernels (`ulum cleanup --kernels`).
+- **Standalone AppImage Desktop Integrator**: Auto-discovers AppImages in `~/Downloads` and `~/Applications`, applies executable bits (`chmod +x`), and registers standard XDG desktop launchers in your Start Menu (`ulum integrate --all`).
+- **Download Size & Metered Connection Warning**: Calculates pre-upgrade bandwidth consumption and warns before downloading large runtime updates (> 1 GB) on metered or mobile connections.
+- **In-App Self-Updater in Settings Dashboard**: Check GitHub releases, preview release notes, and upgrade ULUM directly from the GUI Settings dashboard or CLI (`ulum self-update`).
 - **Seamless Root & Polkit Execution**: Integrated PolicyKit (`pkexec`) authorization and X11 display access forwarding for smooth, passwordless in-app GUI updates without terminal locks.
 - **Automated Health Repair**: Interrupted APT lock and dpkg state auto-repair with `ulum doctor --fix`.
 - **Scheduled Background Updates**: Native user-level systemd timer and desktop notifications (`ulum schedule --install`).
@@ -67,9 +72,9 @@ Seamlessly orchestrate software updates and clean removals across **APT**, **Fla
 Install the pre-built `.deb` package directly:
 
 ```bash
-sudo dpkg -i ulum_0.2.2_all.deb
+sudo dpkg -i ulum_0.3.0_all.deb
 # Or from the repository root:
-sudo dpkg -i dist/ulum_0.2.2_all.deb
+sudo dpkg -i dist/ulum_0.3.0_all.deb
 ```
 
 #### Option B: From Source (Development)
@@ -114,19 +119,22 @@ Privilege Escalation (sudo/root): OK
 
 | Command | Description |
 | :--- | :--- |
-| `ulum doctor [--fix]` | Diagnose distro compatibility, package managers, and storage health (or auto-repair broken locks/dpkg). |
+| `ulum doctor [--fix] [--fix-repos]` | Diagnose distro compatibility, package managers, and storage health (auto-repairs dpkg/locks or disables broken 404 PPAs). |
 | `ulum scan` | Index all installed packages across APT, Flatpak, Snap, and AppImage into local inventory. |
-| `ulum check [--refresh]` | Query available updates across all active package managers. |
+| `ulum check [--refresh]` | Query available updates across all active package managers with estimated download sizes. |
 | `ulum list [--updates]` | Display installed applications or pending updates in rich tables. |
 | `ulum info <id>` | Inspect metadata for a package (e.g. `apt:curl` or `flatpak:org.mozilla.firefox`). |
-| `ulum update --all` | Update all eligible packages across all sources. |
+| `ulum update --all` | Update all eligible packages across all sources with bandwidth/metered safety checks. |
 | `ulum update <id>` | Update a specific application through its native manager. |
 | `ulum update --dry-run` | Preview proposed updates without modifying the system. |
 | `ulum schedule [--install]` | Configure systemd automated background update checks and desktop notifications. |
+| `ulum integrate [path] [--all]` | Register standalone AppImages into desktop application menu and application launcher. |
 | `ulum remove <id>` | Perform standard native uninstallation. |
 | `ulum remove <id> --complete` | Complete removal (purge configs and verified application data). |
 | `ulum leftovers` | Discover orphaned residual configuration and data directories. |
 | `ulum cleanup [--yes]` | Review and permanently delete verified residual leftovers. |
+| `ulum cleanup --kernels [--yes]` | Purge obsolete Linux kernels and free `/boot` partition space while protecting running and fallback kernels. |
+| `ulum self-update [--check]` | Check for newer ULUM releases on GitHub and perform automated in-place upgrades. |
 | `ulum dependencies <id>` | Inspect native package dependencies and reverse dependencies. |
 | `ulum history` | View historical record of software updates. |
 | `ulum removal-history` | View historical record of package uninstalls and deletions. |
@@ -143,11 +151,12 @@ ulum gui
 ./run_gui.sh
 ```
 
-- **Live Updates Tab**: View pending updates across all sources and update individually or in bulk.
-- **Installed Software Tab**: Search, filter by source, inspect dependencies, or trigger standard and complete uninstalls.
-- **Leftovers & Cleanup Tab**: Browse residual directories with confidence ratings and inspect exact disk usage before deletion.
+- **Live Updates Tab**: View pending updates across all sources, see total estimated download sizes (with amber warnings if > 1 GB), and update individually or in bulk.
+- **Installed Software Tab**: Search, filter by source, inspect dependencies, trigger standard and complete uninstalls, and 1-click **Integrate AppImages** into your desktop menu.
+- **Leftovers & Cleanup Tab**: Browse residual directories with confidence ratings and 1-click **Clean Old Kernels** to free `/boot` space.
+- **Diagnostics Popover**: View package manager health and 1-click **Fix 404 Repos** to safely comment out dead PPAs.
 - **Operation History Tab**: Track past system operations, exit codes, and timestamps.
-- **Settings Tab**: Toggle individual package managers, exclude packages from auto-updates, and configure confirmation prompts.
+- **Settings Tab**: Toggle package managers, exclude packages from auto-updates, configure confirmation prompts, and use the **ULUM Application Updates** card to check GitHub and upgrade ULUM directly in-app.
 
 > [!NOTE]
 > When launched from the application launcher or via `ulum-gui`, ULUM uses PolicyKit (`pkexec`) to prompt for administrative authorization once. The dashboard runs in **Root Administrator** mode with X11 display access forwarding, enabling seamless in-app package downloads and installations while preserving the user's database inventory.
@@ -179,15 +188,16 @@ pytest -v
 tests/integration/test_cli.py .....
 tests/unit/test_adapters.py ......
 tests/unit/test_db.py .....
-tests/unit/test_executor.py ....
+tests/unit/test_executor.py ...
 tests/unit/test_gui.py .
 tests/unit/test_leftovers.py ...
+tests/unit/test_new_features.py .........
 tests/unit/test_planner.py ...
 tests/unit/test_safety.py .....
 tests/unit/test_server.py .
 tests/unit/test_system_and_config.py ...
 
-============================== 35 passed ==============================
+============================== 44 passed ==============================
 ```
 
 ---

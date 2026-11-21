@@ -1,8 +1,8 @@
 # Product Requirements Document (PRD)
 # Universal Linux Update Manager (ULUM)
 
-**Document version:** 0.2.2  
-**Status:** Implemented (v0.2.2 Active Baseline)  
+**Document version:** 0.3.0  
+**Status:** Implemented (v0.3.0 Active Baseline)  
 **Product type:** Open-source Linux CLI utility and Modern GTK3/WebKit2 Desktop GUI  
 **Initial target platforms:** Linux Mint 22.x and Ubuntu 24.04 LTS  
 **Primary implementation language:** Python 3.12+  
@@ -312,6 +312,37 @@ Optional notifications:
 
 Notifications must be opt-in or configurable and must not execute updates or removals by themselves.
 
+### 7.8 Broken repository auto-repair (`AptRepoDoctor`)
+
+- Automated detection of dead, expired, or 404 repositories in `/etc/apt/sources.list` and `/etc/apt/sources.list.d/*.list` / `*.sources`.
+- In-place commenting of failing lines (`# DISABLED BY ULUM (404/broken): ...`), restoring `apt-get update` health without requiring manual terminal text editing.
+- Exposed via CLI `ulum doctor --fix-repos` and 1-click "Fix 404 Repos" in the GUI Diagnostics view.
+
+### 7.9 Obsolete Linux kernel & `/boot` partition cleanup (`KernelCleaner`)
+
+- Detection and grouping of installed kernel packages (`linux-image-*`, `linux-headers-*`, `linux-modules-*`) by release.
+- Strict safety model: preserves the active booted kernel (`uname -r`) and the latest fallback kernel.
+- Safe purging of older orphaned kernels and residual `config-files` to recover hundreds of megabytes in `/boot`.
+- Exposed via CLI `ulum cleanup --kernels` (supports `--dry-run`, `-y`) and 1-click "Clean Old Kernels" in the GUI Leftovers view.
+
+### 7.10 Standalone AppImage desktop integration (`AppImageAdapter`)
+
+- Auto-discovery of standalone `.AppImage` binaries across `~/Downloads`, `~/Applications`, and `~/.local/bin`.
+- Auto-generation of clean XDG `.desktop` files in `~/.local/share/applications/` with executable bits (`chmod +x`).
+- Automatic `update-desktop-database` trigger so AppImages appear immediately in the desktop application launcher.
+- Exposed via CLI `ulum integrate [path] [--all]` and 1-click "Integrate AppImages" in the GUI Installed Applications view.
+
+### 7.11 Pre-upgrade download size estimation & metered connection warnings
+
+- Parses dry-run download archives across APT (`apt-get -s dist-upgrade`) and Flatpak (`flatpak remote-ls --columns=download-size`).
+- Warns users when total download volume exceeds 1 GB (`⚠️ Large Download (> 1 GB)` badge in GUI and warnings in CLI before confirming).
+
+### 7.12 In-app self-updater & GitHub release tracking (`SelfUpdater`)
+
+- Queries GitHub Releases API with automated semantic version comparison against the running build.
+- Shows release notes and provides 1-click automated downloading and installation of the updated `.deb` package directly within the app.
+- Exposed via GUI Settings Dashboard ("ULUM Application Updates" card) and CLI `ulum self-update [--check]`.
+
 ## 8. CLI command specification
 
 Proposed executable: `ulum`
@@ -319,7 +350,7 @@ Proposed executable: `ulum`
 | Command | Purpose |
 |---|---|
 | `ulum scan` | Scan installed software and detected sources |
-| `ulum check` | Check for available updates |
+| `ulum check` | Check for available updates and estimate download volume |
 | `ulum list` | List installed application records |
 | `ulum list --updates` | List records with available updates |
 | `ulum sources` | Show detected package managers and status |
@@ -328,17 +359,20 @@ Proposed executable: `ulum`
 | `ulum update --all` | Update all eligible supported applications |
 | `ulum update --source apt` | Update through one source |
 | `ulum update <identifier>` | Update a selected application |
+| `ulum integrate [path] [--all]` | Register standalone AppImages into system desktop menu |
 | `ulum remove <identifier>` | Start standard uninstall |
 | `ulum remove <identifier> --complete` | Build a complete-removal plan |
 | `ulum remove <identifier> --dry-run` | Preview removal without changing the system |
 | `ulum leftovers` | Find and classify possible leftovers |
-| `ulum cleanup` | Review and remove approved leftover candidates |
+| `ulum cleanup [--yes]` | Review and remove approved leftover candidates |
+| `ulum cleanup --kernels [--yes]` | Purge obsolete Linux kernels and free `/boot` partition space |
 | `ulum dependencies <identifier>` | Show dependency information |
 | `ulum history` | Show update history |
 | `ulum removal-history` | Show removal history |
 | `ulum exclude <identifier>` | Exclude an application from bulk operations |
 | `ulum config` | View or edit configuration |
-| `ulum doctor` | Diagnose installation and integration problems |
+| `ulum doctor [--fix] [--fix-repos]` | Diagnose health, repair interrupted locks, and disable 404 PPAs |
+| `ulum self-update [--check]` | Check for new ULUM releases on GitHub and apply updates |
 | `ulum version` | Show ULUM version |
 
 Because names can collide across sources, commands should support an unambiguous form such as `apt:firefox`, `flatpak:org.mozilla.firefox`, or a stable inventory ID. The exact identifier grammar should be finalized during CLI design.
