@@ -23,12 +23,13 @@ class SelfUpdater:
     """Checks for new ULUM application releases on GitHub and handles automated upgrades."""
 
     @classmethod
-    def check_latest_release(cls, timeout: int = 5) -> Dict[str, Any]:
+    def check_latest_release(cls, current_version: Optional[str] = None, timeout: int = 5) -> Dict[str, Any]:
         """Queries GitHub API to determine if a newer ULUM release exists."""
+        cur_version = current_version or __version__
         req = urllib.request.Request(
             API_URL,
             headers={
-                "User-Agent": f"ULUM/{__version__}",
+                "User-Agent": f"ULUM/{cur_version}",
                 "Accept": "application/vnd.github.v3+json",
             },
         )
@@ -38,13 +39,13 @@ class SelfUpdater:
                     return {
                         "success": False,
                         "error": f"GitHub returned HTTP status {response.status}",
-                        "current_version": __version__,
+                        "current_version": cur_version,
                     }
                 data = json.loads(response.read().decode("utf-8"))
 
             tag_name = data.get("tag_name", "").strip()
             latest_version = tag_name.lstrip("v")
-            current_tuple = parse_version_tuple(__version__)
+            current_tuple = parse_version_tuple(cur_version)
             latest_tuple = parse_version_tuple(latest_version)
 
             update_available = latest_tuple > current_tuple
@@ -61,7 +62,7 @@ class SelfUpdater:
 
             return {
                 "success": True,
-                "current_version": __version__,
+                "current_version": cur_version,
                 "latest_version": latest_version,
                 "tag_name": tag_name,
                 "update_available": update_available,
@@ -77,7 +78,7 @@ class SelfUpdater:
             return {
                 "success": False,
                 "error": f"Network unreachable: {e.reason if hasattr(e, 'reason') else e}",
-                "current_version": __version__,
+                "current_version": cur_version,
                 "update_available": False,
             }
         except Exception as e:
@@ -85,7 +86,7 @@ class SelfUpdater:
             return {
                 "success": False,
                 "error": str(e),
-                "current_version": __version__,
+                "current_version": cur_version,
                 "update_available": False,
             }
 
