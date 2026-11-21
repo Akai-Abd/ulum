@@ -464,18 +464,19 @@ Never manually delete shared libraries or assume a dependency is unused based on
 Security is a release-blocking requirement.
 
 1. Run discovery and read-only operations without root whenever possible.
-2. Request elevated privileges only for the specific native operation that needs them.
-3. Never collect or store the user's sudo password.
-4. Use subprocess argument arrays; do not construct shell commands from untrusted input.
-5. Validate identifiers and paths.
-6. Preserve native package-manager locks.
-7. Do not execute arbitrary scripts unless explicitly configured and approved.
-8. Require clear confirmation for destructive operations.
-9. Protect essential system packages and critical paths.
-10. Never silently remove packages, dependencies, configuration, or user data.
-11. Use safe path handling, symlink checks, and ownership verification before file deletion.
-12. Record operation results without logging secrets.
-13. Fail closed when ownership or deletion safety cannot be established.
+2. Request elevated privileges through PolicyKit (`pkexec`) for graphical execution, using a dedicated policy (`org.ulum.pkexec.policy`) with display authorization (`xhost +SI:localuser:root`) to eliminate terminal-password hangs in the GUI dashboard.
+3. Automatically resolve invoking user context (`PKEXEC_UID` / `SUDO_USER`) so elevated processes preserve and update the user's local inventory database (`~/.local/share/ulum/ulum.db`) and configuration rather than isolating state to `/root`.
+4. Never collect or store the user's sudo password.
+5. Use subprocess argument arrays; do not construct shell commands from untrusted input.
+6. Validate identifiers and paths.
+7. Preserve native package-manager locks.
+8. Do not execute arbitrary scripts unless explicitly configured and approved.
+9. Require clear confirmation for destructive operations.
+10. Protect essential system packages and critical paths.
+11. Never silently remove packages, dependencies, configuration, or user data.
+12. Use safe path handling, symlink checks, and ownership verification before file deletion.
+13. Record operation results without logging secrets.
+14. Fail closed when ownership or deletion safety cannot be established.
 
 A dry-run preview is a planning aid, not a security boundary. The executor must independently validate every operation.
 
@@ -916,8 +917,8 @@ All destructive logic must be tested with temporary directories and mocked packa
 
 - [x] GUI desktop application (GTK3 + WebKit2 glassmorphic dashboard).
 - [x] Scheduled update checks and background automation (user systemd timer).
-- [x] Pre-update snapshot integration (Timeshift / Snapper restore points).
 - [x] Health repair and auto-fix diagnostics (`ulum doctor --fix`).
+- [ ] Optional filesystem snapshot integration (decoupled from default update workflow).
 - [ ] Fedora, Arch, and openSUSE adapters (DNF, Pacman, Zypper).
 - [ ] More application-specific updater integrations.
 - [ ] System tray notifications.

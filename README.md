@@ -21,7 +21,7 @@ Seamlessly orchestrate software updates and clean removals across **APT**, **Fla
 ## 🌟 Key Features
 
 - **Unified Multi-Source Updates**: Check and upgrade packages across system repositories (APT), sandboxed runtimes (Flatpak), containerized snaps (Snap), and standalone binaries (AppImage) in one command.
-- **Pre-Update System Snapshots**: Automatically triggers Timeshift or Snapper restore points before critical updates with `--snapshot` or GUI toggle.
+- **Seamless Root & Polkit Execution**: Integrated PolicyKit (`pkexec`) authorization and X11 display access forwarding for smooth, passwordless in-app GUI updates without terminal locks.
 - **Automated Health Repair**: Interrupted APT lock and dpkg state auto-repair with `ulum doctor --fix`.
 - **Scheduled Background Updates**: Native user-level systemd timer and desktop notifications (`ulum schedule --install`).
 - **Safe Application Removal**: Complete and standard uninstallation workflows powered by native package managers with dependency analysis and reverse-dependency protection.
@@ -119,7 +119,7 @@ Privilege Escalation (sudo/root): OK
 | `ulum check [--refresh]` | Query available updates across all active package managers. |
 | `ulum list [--updates]` | Display installed applications or pending updates in rich tables. |
 | `ulum info <id>` | Inspect metadata for a package (e.g. `apt:curl` or `flatpak:org.mozilla.firefox`). |
-| `ulum update --all [--snapshot]` | Update all eligible packages across all sources (optional Timeshift/Snapper snapshot). |
+| `ulum update --all` | Update all eligible packages across all sources. |
 | `ulum update <id>` | Update a specific application through its native manager. |
 | `ulum update --dry-run` | Preview proposed updates without modifying the system. |
 | `ulum schedule [--install]` | Configure systemd automated background update checks and desktop notifications. |
@@ -148,6 +148,9 @@ ulum gui
 - **Leftovers & Cleanup Tab**: Browse residual directories with confidence ratings and inspect exact disk usage before deletion.
 - **Operation History Tab**: Track past system operations, exit codes, and timestamps.
 - **Settings Tab**: Toggle individual package managers, exclude packages from auto-updates, and configure confirmation prompts.
+
+> [!NOTE]
+> When launched from the application launcher or via `ulum-gui`, ULUM uses PolicyKit (`pkexec`) to prompt for administrative authorization once. The dashboard runs in **Root Administrator** mode with X11 display access forwarding, enabling seamless in-app package downloads and installations while preserving the user's database inventory.
 
 ---
 
@@ -184,7 +187,7 @@ tests/unit/test_safety.py .....
 tests/unit/test_server.py .
 tests/unit/test_system_and_config.py ...
 
-============================== 36 passed ==============================
+============================== 35 passed ==============================
 ```
 
 ---
