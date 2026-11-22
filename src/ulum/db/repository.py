@@ -138,26 +138,28 @@ class Repository:
                             upd.available_version,
                             now,
                             upd.details,
+                            getattr(upd, "urgency", "Unknown") or "Unknown",
                         )
                         for upd in updates
                     ]
                     self.conn.executemany(
                         """
                         INSERT INTO updates (
-                            source, package_id, current_version, available_version, detected_at, details
-                        ) VALUES (?, ?, ?, ?, ?, ?)
+                            source, package_id, current_version, available_version, detected_at, details, urgency
+                        ) VALUES (?, ?, ?, ?, ?, ?, ?)
                         ON CONFLICT(source, package_id) DO UPDATE SET
                             current_version = excluded.current_version,
                             available_version = excluded.available_version,
                             detected_at = excluded.detected_at,
-                            details = excluded.details
+                            details = excluded.details,
+                            urgency = excluded.urgency
                         """,
                         rows,
                     )
 
     def get_updates(self, source: Optional[str] = None) -> List[dict]:
         query = """
-            SELECT u.id, u.source, u.package_id, a.display_name, u.current_version, u.available_version, u.detected_at, u.details
+            SELECT u.id, u.source, u.package_id, a.display_name, u.current_version, u.available_version, u.detected_at, u.details, u.urgency
             FROM updates u
             LEFT JOIN applications a ON u.source = a.source AND u.package_id = a.package_id
         """
@@ -340,3 +342,228 @@ class Repository:
         with self._lock:
             with self.conn:
                 self.conn.execute("DELETE FROM cleanup_candidates WHERE path = ?", (path,))
+
+    def record_operation_history(
+        self,
+        operation_type: str,
+        target_id: Optional[str] = None,
+        source: Optional[str] = None,
+        status: str = "success",
+        exit_code: int = 0,
+        approved_plan_summary: Optional[str] = None,
+        backup_path: Optional[str] = None,
+        snapshot_id: Optional[str] = None,
+        started_at: Optional[str] = None,
+        finished_at: Optional[str] = None,
+        error_summary: Optional[str] = None,
+    ) -> int:
+        now = datetime.datetime.now(datetime.timezone.utc).isoformat()
+        start = started_at or now
+        finish = finished_at or now
+        with self._lock:
+            with self.conn:
+                cursor = self.conn.execute(
+                    """
+                    INSERT INTO operation_history (
+                        operation_type, target_id, source, status, exit_code,
+                        approved_plan_summary, backup_path, snapshot_id,
+                        started_at, finished_at, error_summary
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    """,
+                    (
+                        operation_type,
+                        target_id,
+                        source,
+                        status,
+                        exit_code,
+                        approved_plan_summary,
+                        backup_path,
+                        snapshot_id,
+                        start,
+                        finish,
+                        error_summary,
+                    ),
+                )
+                return cursor.lastrowid or 0
+
+    def get_operation_history(
+        self, limit: int = 50, operation_type: Optional[str] = None
+    ) -> List[dict]:
+        query = "SELECT * FROM operation_history"
+        params: list = []
+        if operation_type:
+            query += " WHERE operation_type = ?"
+            params.append(operation_type)
+        query += " ORDER BY id DESC LIMIT ?"
+        params.append(limit)
+        with self._lock:
+            cursor = self.conn.execute(query, params)
+            return [dict(row) for row in cursor.fetchall()]
+
+    def record_repo_fix(
+        self,
+        file_path: str,
+        line_number: Optional[int],
+        line_text: Optional[str],
+        error: Optional[str],
+        first_failed_at: Optional[str] = None,
+        second_failed_at: Optional[str] = None,
+        backup_path: Optional[str] = None,
+        status: str = "disabled",
+    ) -> int:
+        now = datetime.datetime.now(datetime.timezone.utc).isoformat()
+        with self._lock:
+            with self.conn:
+                cursor = self.conn.execute(
+                    """
+                    INSERT INTO repo_fixes (
+                        file_path, line_number, line_text, error,
+                        first_failed_at, second_failed_at, backup_path, status, created_at
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    """,
+                    (
+                        file_path,
+                        line_number,
+                        line_text,
+                        error,
+                        first_failed_at or now,
+                        second_failed_at,
+                        backup_path,
+                        status,
+                        now,
+                    ),
+                )
+                return cursor.lastrowid or 0
+
+    def get_repo_fixes(self, status: Optional[str] = None) -> List[dict]:
+        query = "SELECT * FROM repo_fixes"
+        params: list = []
+        if status:
+            query += " WHERE status = ?"
+            params.append(status)
+        query += " ORDER BY id DESC"
+        with self._lock:
+            cursor = self.conn.execute(query, params)
+            return [dict(row) for row in cursor.fetchall()]
+
+    def mark_repo_fix_restored(self, fix_id: int) -> None:
+        now = datetime.datetime.now(datetime.timezone.utc).isoformat()
+        with self._lock:
+            with self.conn:
+                self.conn.execute(
+                    "UPDATE repo_fixes SET status = 'restored', restored_at = ? WHERE id = ?",
+                    (now, fix_id),
+                )
+
+    def record_kernel_clean(
+        self,
+        kernel_release: str,
+        package_ids: List[str],
+        is_booted: bool = False,
+        is_fallback: bool = False,
+        estimated_freed_bytes: int = 0,
+        actual_freed_bytes: int = 0,
+        snapshot_tool: Optional[str] = None,
+        snapshot_id: Optional[str] = None,
+        snapshot_taken: bool = False,
+        status: str = "success",
+        started_at: Optional[str] = None,
+        finished_at: Optional[str] = None,
+        error_summary: Optional[str] = None,
+    ) -> int:
+        now = datetime.datetime.now(datetime.timezone.utc).isoformat()
+        with self._lock:
+            with self.conn:
+                cursor = self.conn.execute(
+                    """
+                    INSERT INTO kernel_cleans (
+                        kernel_release, package_ids, is_booted, is_fallback,
+                        estimated_freed_bytes, actual_freed_bytes, snapshot_tool,
+                        snapshot_id, snapshot_taken, status, started_at, finished_at, error_summary
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    """,
+                    (
+                        kernel_release,
+                        json.dumps(package_ids),
+                        1 if is_booted else 0,
+                        1 if is_fallback else 0,
+                        estimated_freed_bytes,
+                        actual_freed_bytes,
+                        snapshot_tool,
+                        snapshot_id,
+                        1 if snapshot_taken else 0,
+                        status,
+                        started_at or now,
+                        finished_at or now,
+                        error_summary,
+                    ),
+                )
+                return cursor.lastrowid or 0
+
+    def record_appimage_integration(
+        self,
+        binary_path: str,
+        desktop_path: str,
+        display_name: str,
+        backup_desktop_path: Optional[str] = None,
+        status: str = "integrated",
+    ) -> int:
+        now = datetime.datetime.now(datetime.timezone.utc).isoformat()
+        with self._lock:
+            with self.conn:
+                cursor = self.conn.execute(
+                    """
+                    INSERT INTO appimage_integrations (
+                        binary_path, desktop_path, display_name,
+                        backup_desktop_path, status, created_at, last_verified_at
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?)
+                    """,
+                    (
+                        binary_path,
+                        desktop_path,
+                        display_name,
+                        backup_desktop_path,
+                        status,
+                        now,
+                        now,
+                    ),
+                )
+                return cursor.lastrowid or 0
+
+    def record_self_update(
+        self,
+        from_version: str,
+        to_version: str,
+        release_url: Optional[str] = None,
+        download_sha256: Optional[str] = None,
+        verified: bool = False,
+        rollback_artefact_path: Optional[str] = None,
+        status: str = "success",
+        started_at: Optional[str] = None,
+        finished_at: Optional[str] = None,
+        error_summary: Optional[str] = None,
+    ) -> int:
+        now = datetime.datetime.now(datetime.timezone.utc).isoformat()
+        with self._lock:
+            with self.conn:
+                cursor = self.conn.execute(
+                    """
+                    INSERT INTO self_updates (
+                        from_version, to_version, release_url, download_sha256,
+                        verified, rollback_artefact_path, status, started_at, finished_at, error_summary
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    """,
+                    (
+                        from_version,
+                        to_version,
+                        release_url,
+                        download_sha256,
+                        1 if verified else 0,
+                        rollback_artefact_path,
+                        status,
+                        started_at or now,
+                        finished_at or now,
+                        error_summary,
+                    ),
+                )
+                return cursor.lastrowid or 0

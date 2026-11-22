@@ -18,6 +18,16 @@ class ConfidenceLevel(str, Enum):
     PROBABLE = "probable"
     UNKNOWN = "unknown"
 
+class UrgencyLevel(str, Enum):
+    SECURITY = "Security"
+    CRITICAL = "Critical"
+    FEATURE = "Feature"
+    OPTIONAL = "Optional"
+    UNKNOWN = "Unknown"
+
+def is_security_only(urgency: str) -> bool:
+    return str(urgency).strip().capitalize() in ("Security", "Critical")
+
 @dataclass(frozen=True)
 class ApplicationRecord:
     source: SourceType
@@ -38,6 +48,8 @@ class UpdateRecord:
     application: ApplicationRecord
     available_version: str
     details: Optional[str] = None
+    urgency: str = "Unknown"
+    download_size_bytes: Optional[int] = None
 
 @dataclass
 class CleanupCandidate:

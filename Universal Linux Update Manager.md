@@ -1,8 +1,8 @@
 # Product Requirements Document (PRD)
 # Universal Linux Update Manager (ULUM)
 
-**Document version:** 0.3.0  
-**Status:** Implemented (v0.3.0 Active Baseline)  
+**Document version:** 0.4.0  
+**Status:** In Progress (v0.4.0 Database Schema & Migrations Implemented)  
 **Product type:** Open-source Linux CLI utility and Modern GTK3/WebKit2 Desktop GUI  
 **Initial target platforms:** Linux Mint 22.x and Ubuntu 24.04 LTS  
 **Primary implementation language:** Python 3.12+  
@@ -624,6 +624,7 @@ Use a uniqueness constraint appropriate to source, scope, and package ID.
 - `detected_at`
 - `status`
 - `details`
+- `urgency` (`Security`, `Critical`, `Feature`, `Optional`, `Unknown`)
 
 ### 13.3 `update_history`
 
@@ -673,6 +674,92 @@ Use a uniqueness constraint appropriate to source, scope, and package ID.
 - `key`
 - `value`
 - `updated_at`
+
+### 13.7 `repo_fixes` (v0.4.0)
+
+- `id`
+- `file_path`
+- `line_number`
+- `line_text`
+- `error`
+- `first_failed_at`
+- `second_failed_at`
+- `backup_path`
+- `status` (`disabled`, `restored`, `transient`)
+- `created_at`
+- `restored_at`
+
+### 13.8 `kernel_cleans` (v0.4.0)
+
+- `id`
+- `kernel_release`
+- `package_ids`
+- `is_booted`
+- `is_fallback`
+- `estimated_freed_bytes`
+- `actual_freed_bytes`
+- `snapshot_tool`
+- `snapshot_id`
+- `snapshot_taken`
+- `status`
+- `started_at`
+- `finished_at`
+- `error_summary`
+
+### 13.9 `appimage_integrations` (v0.4.0)
+
+- `id`
+- `binary_path`
+- `desktop_path`
+- `display_name`
+- `backup_desktop_path`
+- `status` (`integrated`, `replaced`, `stale`, `removed`)
+- `created_at`
+- `last_verified_at`
+
+### 13.10 `download_estimates` (v0.4.0)
+
+- `id`
+- `scan_id`
+- `source`
+- `estimated_bytes`
+- `estimated_at`
+- `expires_at`
+- `status`
+
+### 13.11 `self_updates` (v0.4.0)
+
+- `id`
+- `from_version`
+- `to_version`
+- `release_url`
+- `download_sha256`
+- `verified`
+- `rollback_artefact_path`
+- `status`
+- `started_at`
+- `finished_at`
+- `error_summary`
+
+### 13.12 `operation_history` (v0.4.0)
+
+Unified history table extending individual history tables:
+- `id`
+- `operation_type` (`update`, `remove`, `repo_fix`, `kernel_clean`, `integrate`, `self_update`, `snapshot`)
+- `target_id`
+- `source`
+- `status`
+- `exit_code`
+- `approved_plan_summary`
+- `backup_path`
+- `snapshot_id`
+- `started_at`
+- `finished_at`
+- `error_summary`
+
+### 13.13 Database Migrations (v0.4.0)
+
+Versioned migrations executed sequentially in `src/ulum/db/migrations.py` using `PRAGMA user_version`.
 
 Avoid storing full file contents, secrets, or unnecessary personal data in the database.
 

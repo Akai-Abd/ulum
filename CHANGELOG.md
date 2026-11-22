@@ -7,6 +7,29 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [0.4.0] - 2026-11-23
+
+### 🗄️ Database Schema & Data Model Modernization (v0.4.0 Step 1)
+
+- **Versioned SQLite Schema Migrations (`src/ulum/db/migrations.py`)**:
+  - Implemented versioned migration framework using SQLite `PRAGMA user_version` (Version 2 / v0.4.0).
+  - Automatically migrates existing v0.3.0 databases without data loss or manual user intervention.
+- **Security Urgency Tracking on Pending Updates**:
+  - Added `urgency` column (`Security`, `Critical`, `Feature`, `Optional`, `Unknown`) to the `updates` table with default value `'Unknown'`.
+  - Added `UrgencyLevel` enum and `is_security_only()` predicate in `src/ulum/core/models.py`.
+- **Dedicated Audit & Operation Tracking Tables**:
+  - `operation_history`: Unified log tracking all operations (`update`, `remove`, `repo_fix`, `kernel_clean`, `integrate`, `self_update`, `snapshot`) with status, exit code, plan summary, backup path, snapshot ID, and timings.
+  - `repo_fixes`: Detailed logging for AptRepoDoctor repository repairs, lines commented, and backup paths.
+  - `kernel_cleans`: Obsolete kernel purge history, packages removed, space freed, and snapshot status.
+  - `appimage_integrations`: Standalone AppImage desktop launcher registrations, backups, and status.
+  - `download_estimates`: Bandwidth estimation caching per source with expiration timestamps.
+  - `self_updates`: ULUM self-update log with SHA256 verification status and rollback artifact paths.
+- **Repository Methods**:
+  - Extended `Repository` in `src/ulum/db/repository.py` to record and query operation history, repo fixes, kernel cleans, and self-updates.
+  - Updated `save_updates` and `get_updates` to store and retrieve update urgency levels.
+
+---
+
 ## [0.3.0] - 2026-11-21
 
 ### 🚀 Major Feature Release: System Health, /boot Protection, AppImage Integration & In-App Self-Updates
