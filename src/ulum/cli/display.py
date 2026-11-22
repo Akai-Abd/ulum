@@ -8,6 +8,7 @@ from ulum.core.models import (
     RemovalPlan,
     SystemInfo,
     UpdateRecord,
+    is_security_only,
 )
 
 console = Console()
@@ -59,13 +60,17 @@ def print_updates_table(updates: List[UpdateRecord]) -> None:
     table.add_column("Source", style="magenta")
     table.add_column("Current Version", style="yellow")
     table.add_column("Available Version", style="green")
+    table.add_column("Urgency", style="red")
 
     for upd in updates:
+        urg = getattr(upd, "urgency", "Unknown") or "Unknown"
+        urg_style = "bold red" if is_security_only(urg) else "dim"
         table.add_row(
             upd.application.qualified_id,
             upd.application.source.value,
             upd.application.installed_version,
             upd.available_version,
+            f"[{urg_style}]{urg}[/{urg_style}]",
         )
     console.print(table)
     console.print(f"[bold]Total update candidates: {len(updates)}[/bold]\n")

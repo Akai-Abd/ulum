@@ -343,20 +343,33 @@ Notifications must be opt-in or configurable and must not execute updates or rem
 - Shows release notes and provides 1-click automated downloading and installation of the updated `.deb` package directly within the app.
 - Exposed via GUI Settings Dashboard ("ULUM Application Updates" card) and CLI `ulum self-update [--check]`.
 
+### 7.13 Parallel, incremental, bounded engine (v0.4.0)
+
+- Concurrently queries all enabled package managers (APT, Flatpak, Snap, AppImage) using Python `asyncio` and thread delegation.
+- Enforces strict 30-second per-adapter timeouts so hanging remote repositories or network glitches do not freeze the tool.
+- Reports failed or timed-out sources explicitly with elapsed runtime and error details (never silently reporting 0 updates).
+- Caches inventory and update metadata in SQLite with a 1-hour TTL.
+
+### 7.14 Security-first origin tagging (`--security-only`) (v0.4.0)
+
+- Inspects the origin pocket of pending APT updates (via `apt list --upgradable`).
+- Tags packages originating from `-security` pockets (e.g. `noble-security`) with `urgency = "Security"`.
+- Allows upgrading only security-critical packages via `ulum update --security-only` without requiring a full distribution or bulk package upgrade.
+
 ## 8. CLI command specification
 
 Proposed executable: `ulum`
 
 | Command | Purpose |
 |---|---|
-| `ulum scan` | Scan installed software and detected sources |
-| `ulum check` | Check for available updates and estimate download volume |
-| `ulum list` | List installed application records |
-| `ulum list --updates` | List records with available updates |
+| `ulum scan` | Scan installed software and detected sources concurrently |
+| `ulum check [--security-only]` | Check for available updates concurrently with per-source timings and download estimates |
+| `ulum list [--updates] [--security-only]` | List installed application records or pending updates |
 | `ulum sources` | Show detected package managers and status |
 | `ulum info <identifier>` | Show details for a source-qualified application |
 | `ulum update --dry-run` | Preview supported updates |
 | `ulum update --all` | Update all eligible supported applications |
+| `ulum update --security-only` | Update only Security and Critical updates (APT-only in v0.4) |
 | `ulum update --source apt` | Update through one source |
 | `ulum update <identifier>` | Update a selected application |
 | `ulum integrate [path] [--all]` | Register standalone AppImages into system desktop menu |

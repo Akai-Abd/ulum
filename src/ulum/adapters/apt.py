@@ -14,6 +14,46 @@ from ulum.core.models import (
 )
 from ulum.utils.process import command_exists, run_cmd
 
+def parse_apt_upgradable_line(line: str) -> Optional[dict]:
+    """Parse a single line from 'apt list --upgradable' for version and security origin pocket."""
+    line = line.strip()
+    if not line or line.startswith("Listing") or "[" not in line:
+        return None
+    try:
+        parts = line.split()
+        if len(parts) < 4:
+            return None
+        pkg_and_origin = parts[0]
+        avail_ver = parts[1]
+        arch = parts[2]
+
+        if "/" not in pkg_and_origin:
+            return None
+        pkg_id, origin = pkg_and_origin.split("/", 1)
+
+        origins = origin.split(",")
+        is_security = any(
+            orig.strip().endswith("-security") or "security" in orig.strip().lower()
+            for orig in origins
+        )
+        urgency = "Security" if is_security else "Unknown"
+
+        cur_ver = "unknown"
+        if "from:" in line:
+            from_part = line.split("from:", 1)[1]
+            cur_ver = from_part.rstrip("]").strip()
+
+        return {
+            "package_id": pkg_id,
+            "origin": origin,
+            "available_version": avail_ver,
+            "arch": arch,
+            "current_version": cur_ver,
+            "urgency": urgency,
+        }
+    except Exception:
+        return None
+
 class AptAdapter(BaseAdapter):
     @property
     def name(self) -> str:
@@ -52,6 +92,15 @@ class AptAdapter(BaseAdapter):
         if refresh:
             run_cmd(["apt-get", "update"], require_root=True)
 
+        # Parse upgradable origins for security tagging
+        security_map: Dict[str, str] = {}
+        upgradable_res = run_cmd(["apt", "list", "--upgradable"])
+        if upgradable_res.returncode == 0:
+            for line in upgradable_res.stdout.splitlines():
+                parsed = parse_apt_upgradable_line(line)
+                if parsed:
+                    security_map[parsed["package_id"]] = parsed["urgency"]
+
         res = run_cmd(["apt-get", "-s", "dist-upgrade"])
         if res.returncode != 0:
             return []
@@ -68,6 +117,7 @@ class AptAdapter(BaseAdapter):
                 pkg_id = m.group(1)
                 cur_ver = m.group(2) or (installed_map[pkg_id].installed_version if pkg_id in installed_map else "unknown")
                 new_ver = m.group(3) or "unknown"
+                urgency = security_map.get(pkg_id, "Unknown")
                 app = installed_map.get(
                     pkg_id,
                     ApplicationRecord(
@@ -78,7 +128,7 @@ class AptAdapter(BaseAdapter):
                         installed_version=cur_ver,
                     ),
                 )
-                updates.append(UpdateRecord(application=app, available_version=new_ver))
+                updates.append(UpdateRecord(application=app, available_version=new_ver, urgency=urgency))
         return updates
 
     def build_update_command(self, targets: Optional[Sequence[str]] = None) -> List[str]:

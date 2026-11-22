@@ -39,3 +39,8 @@ def test_cli_update_dry_run(monkeypatch):
     result = runner.invoke(app, ["update", "apt:curl", "--dry-run", "--yes"])
     assert result.exit_code == 0
     assert "DRY-RUN mode" in result.stdout
+
+def test_cli_update_security_only(monkeypatch):
+    result = runner.invoke(app, ["update", "--security-only", "--dry-run", "--yes"])
+    assert result.exit_code == 0
+    assert "Security" in result.stdout

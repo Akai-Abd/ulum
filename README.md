@@ -21,6 +21,8 @@ Seamlessly orchestrate software updates and clean removals across **APT**, **Fla
 ## 🌟 Key Features
 
 - **Unified Multi-Source Updates**: Check and upgrade packages across system repositories (APT), sandboxed runtimes (Flatpak), containerized snaps (Snap), and standalone binaries (AppImage) in one command.
+- **Concurrent Async Engine with Timeouts**: Scans all enabled package sources in parallel with 30-second bounded timeouts and 1-hour inventory caching.
+- **Security-First Tagging (`--security-only`)**: Identifies APT security updates directly from `-security` pocket origins and updates critical vulnerabilities first (`ulum update --security-only`).
 - **Broken PPA & 404 Repo Auto-Fix**: Diagnoses dead or expired repositories in `/etc/apt/sources.list.d/` and comments them out safely (`ulum doctor --fix-repos` or 1-click in GUI Diagnostics).
 - **Obsolete Kernel & `/boot` Partition Saver**: Intelligently identifies and purges obsolete Linux kernels and residual config files while strictly guarding active booted (`uname -r`) and fallback kernels (`ulum cleanup --kernels`).
 - **Standalone AppImage Desktop Integrator**: Auto-discovers AppImages in `~/Downloads` and `~/Applications`, applies executable bits (`chmod +x`), and registers standard XDG desktop launchers in your Start Menu (`ulum integrate --all`).
@@ -125,6 +127,7 @@ Privilege Escalation (sudo/root): OK
 | `ulum list [--updates]` | Display installed applications or pending updates in rich tables. |
 | `ulum info <id>` | Inspect metadata for a package (e.g. `apt:curl` or `flatpak:org.mozilla.firefox`). |
 | `ulum update --all` | Update all eligible packages across all sources with bandwidth/metered safety checks. |
+| `ulum update --security-only` | Update only packages tagged as Security or Critical (APT-only in v0.4). |
 | `ulum update <id>` | Update a specific application through its native manager. |
 | `ulum update --dry-run` | Preview proposed updates without modifying the system. |
 | `ulum schedule [--install]` | Configure systemd automated background update checks and desktop notifications. |
@@ -185,10 +188,10 @@ pytest -v
 ```
 
 ```text
-tests/integration/test_cli.py .....
-tests/unit/test_adapters.py ......
+tests/integration/test_cli.py ......
+tests/unit/test_adapters.py .......
 tests/unit/test_db.py ........
-tests/unit/test_executor.py ...
+tests/unit/test_executor.py ......
 tests/unit/test_gui.py .
 tests/unit/test_leftovers.py ...
 tests/unit/test_new_features.py .........
@@ -197,7 +200,7 @@ tests/unit/test_safety.py .....
 tests/unit/test_server.py .
 tests/unit/test_system_and_config.py ...
 
-============================== 47 passed ==============================
+============================== 52 passed ==============================
 ```
 
 ---

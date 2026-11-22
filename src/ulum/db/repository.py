@@ -343,6 +343,24 @@ class Repository:
             with self.conn:
                 self.conn.execute("DELETE FROM cleanup_candidates WHERE path = ?", (path,))
 
+    def get_setting(self, key: str) -> Optional[str]:
+        with self._lock:
+            cursor = self.conn.execute("SELECT value FROM settings WHERE key = ? LIMIT 1", (key,))
+            row = cursor.fetchone()
+            return str(row["value"]) if row else None
+
+    def set_setting(self, key: str, value: str) -> None:
+        now = datetime.datetime.now(datetime.timezone.utc).isoformat()
+        with self._lock:
+            with self.conn:
+                self.conn.execute(
+                    """
+                    INSERT INTO settings (key, value, updated_at) VALUES (?, ?, ?)
+                    ON CONFLICT(key) DO UPDATE SET value = excluded.value, updated_at = excluded.updated_at
+                    """,
+                    (key, str(value), now),
+                )
+
     def record_operation_history(
         self,
         operation_type: str,

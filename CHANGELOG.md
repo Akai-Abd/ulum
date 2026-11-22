@@ -9,6 +9,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [0.4.0] - 2026-11-23
 
+### ⚡ Parallel Async Engine & Security Tagging (v0.4.0 Step 2)
+
+- **Concurrent Async Scanner (`src/ulum/core/orchestrator.py`)**:
+  - Refactored `scan_all()` and `check_updates()` to execute package manager checks concurrently across APT, Flatpak, Snap, and AppImage via `asyncio.to_thread` and `asyncio.gather`.
+  - Added strict 30-second per-adapter timeouts preventing slow or stalled remotes (e.g. unreachable Flatpak hubs) from holding up system scans.
+  - Failures and timeouts report with their exact error message and elapsed time; broken adapters are never silently reported as 0 updates.
+  - Implemented 1-hour inventory cache TTL with age reporting in CLI and GUI.
+- **APT Security Origin Tagging (`src/ulum/adapters/apt.py`)**:
+  - Implemented `parse_apt_upgradable_line()` parsing the origin pocket in `apt list --upgradable`.
+  - Upgrades arriving from pockets ending with `-security` (e.g. `noble-security`) are automatically tagged `urgency="Security"`; non-security updates remain `"Unknown"`.
+- **Security-First CLI (`ulum update --security-only`)**:
+  - Added `--security-only` flag to `ulum update`, `ulum check`, and `ulum list --updates`.
+  - Filters update targets strictly to Security and Critical candidates, ensuring users can patch critical vulnerabilities without performing full distribution upgrades.
+  - Displays "Urgency" badge column in the CLI Available Updates table.
+
 ### 🗄️ Database Schema & Data Model Modernization (v0.4.0 Step 1)
 
 - **Versioned SQLite Schema Migrations (`src/ulum/db/migrations.py`)**:

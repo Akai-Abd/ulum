@@ -101,3 +101,98 @@ def test_orchestrator_update_clears_pending_updates(temp_db, monkeypatch):
     results = orc.execute_updates(targets=["apt:curl"], dry_run=False)
     assert results[0][1].success
     assert len(repo.get_updates()) == 0
+
+def test_orchestrator_execute_security_only(temp_db, monkeypatch):
+    from ulum.core.config import UlumConfig
+    from ulum.core.orchestrator import Orchestrator
+    from ulum.core.models import UpdateRecord
+
+    repo, _ = temp_db
+    config = UlumConfig()
+    orc = Orchestrator(repo, config)
+
+    sec_app = ApplicationRecord(SourceType.APT, ScopeType.SYSTEM, "curl", "curl", "1.0")
+    feat_app = ApplicationRecord(SourceType.APT, ScopeType.SYSTEM, "vim", "vim", "2.0")
+    repo.save_updates([
+        UpdateRecord(sec_app, "1.1", urgency="Security"),
+        UpdateRecord(feat_app, "2.1", urgency="Unknown"),
+    ])
+    assert len(repo.get_updates()) == 2
+
+    executed_targets = []
+    def mock_execute(targets=None):
+        if targets:
+            executed_targets.extend(targets)
+        return ExecutionResult(success=True, exit_code=0)
+
+    monkeypatch.setattr(orc.adapters["apt"], "execute_update", mock_execute)
+
+    results = orc.execute_updates(security_only=True, dry_run=False)
+    assert len(results) == 1
+    assert results[0][1].success
+    assert executed_targets == ["curl"]
+
+    # Security update was cleared, feature update remains
+    remaining = repo.get_updates()
+    assert len(remaining) == 1
+    assert remaining[0]["package_id"] == "vim"
+
+    # Operation history entry recorded
+    op_hist = repo.get_operation_history(operation_type="update")
+    assert len(op_hist) >= 1
+    assert op_hist[0]["status"] == "success"
+
+def test_orchestrator_parallel_check_updates_and_timeout(temp_db, monkeypatch):
+    import time
+    from ulum.core.config import UlumConfig
+    from ulum.core.orchestrator import Orchestrator
+    from ulum.core.models import UpdateRecord
+
+    repo, _ = temp_db
+    config = UlumConfig(enabled_adapters=["apt", "flatpak"])
+    orc = Orchestrator(repo, config)
+
+    # Mock APT: fast with 1 update
+    apt_app = ApplicationRecord(SourceType.APT, ScopeType.SYSTEM, "curl", "curl", "1.0")
+    monkeypatch.setattr(orc.adapters["apt"], "is_available", lambda: True)
+    monkeypatch.setattr(orc.adapters["apt"], "check_updates", lambda refresh=False: [UpdateRecord(apt_app, "1.1", urgency="Security")])
+
+    # Mock Flatpak: hangs
+    def slow_check(refresh=False):
+        time.sleep(1.0)
+        return []
+
+    monkeypatch.setattr(orc.adapters["flatpak"], "is_available", lambda: True)
+    monkeypatch.setattr(orc.adapters["flatpak"], "check_updates", slow_check)
+
+    # Run check with a 0.2s timeout for testing
+    detailed = orc.check_updates_detailed(refresh=True, timeout=0.2)
+    assert len(detailed["updates"]) == 1
+    assert detailed["updates"][0].application.package_id == "curl"
+    assert detailed["source_status"]["apt"]["status"] == "success"
+    assert detailed["source_status"]["flatpak"]["status"] == "failed"
+    assert "Timed out" in detailed["source_status"]["flatpak"]["error"]
+
+def test_orchestrator_check_updates_cached(temp_db, monkeypatch):
+    from ulum.core.config import UlumConfig
+    from ulum.core.orchestrator import Orchestrator
+    from ulum.core.models import UpdateRecord
+
+    repo, _ = temp_db
+    config = UlumConfig(enabled_adapters=["apt"])
+    orc = Orchestrator(repo, config)
+
+    apt_app = ApplicationRecord(SourceType.APT, ScopeType.SYSTEM, "curl", "curl", "1.0")
+    monkeypatch.setattr(orc.adapters["apt"], "is_available", lambda: True)
+    monkeypatch.setattr(orc.adapters["apt"], "check_updates", lambda refresh=False: [UpdateRecord(apt_app, "1.1")])
+
+    # First check: live
+    res1 = orc.check_updates_detailed(refresh=False)
+    assert not res1["is_cached"]
+
+    # Second check without refresh: cached
+    res2 = orc.check_updates_detailed(refresh=False)
+    assert res2["is_cached"]
+    assert len(res2["updates"]) == 1
+    assert res2["updates"][0].application.package_id == "curl"
+

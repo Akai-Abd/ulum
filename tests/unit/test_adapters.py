@@ -1,8 +1,30 @@
 import subprocess
-from ulum.adapters.apt import AptAdapter
+from ulum.adapters.apt import AptAdapter, parse_apt_upgradable_line
 from ulum.adapters.flatpak import FlatpakAdapter
 from ulum.adapters.snap import SnapAdapter
 from ulum.core.models import ApplicationRecord, ScopeType, SourceType
+
+def test_parse_apt_upgradable_line():
+    sec_line = "curl/noble-security 7.88.1-10ubuntu2.4 amd64 [upgradable from: 7.88.1-10ubuntu2.3]"
+    parsed_sec = parse_apt_upgradable_line(sec_line)
+    assert parsed_sec is not None
+    assert parsed_sec["package_id"] == "curl"
+    assert parsed_sec["available_version"] == "7.88.1-10ubuntu2.4"
+    assert parsed_sec["current_version"] == "7.88.1-10ubuntu2.3"
+    assert parsed_sec["urgency"] == "Security"
+
+    multi_origin_sec = "libssl3/noble-updates,noble-security 3.0.13-0ubuntu3.4 amd64 [upgradable from: 3.0.13-0ubuntu3.3]"
+    parsed_multi = parse_apt_upgradable_line(multi_origin_sec)
+    assert parsed_multi is not None
+    assert parsed_multi["urgency"] == "Security"
+
+    non_sec_line = "vim/noble-updates 2:9.1.0016-1ubuntu7.3 amd64 [upgradable from: 2:9.1.0016-1ubuntu7.1]"
+    parsed_non_sec = parse_apt_upgradable_line(non_sec_line)
+    assert parsed_non_sec is not None
+    assert parsed_non_sec["urgency"] == "Unknown"
+
+    header_line = "Listing... Done"
+    assert parse_apt_upgradable_line(header_line) is None
 
 def test_apt_adapter_list_installed(monkeypatch):
     adapter = AptAdapter()

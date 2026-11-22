@@ -14,6 +14,7 @@ from ulum.cli.display import (
     print_updates_table,
 )
 from ulum.core.config import load_config
+from ulum.core.models import is_security_only
 from ulum.core.orchestrator import Orchestrator
 from ulum.core.system import detect_package_managers, get_system_info
 from ulum.db.database import get_db_path, init_db
@@ -79,11 +80,30 @@ def scan_cmd():
 def check_cmd(
     refresh: bool = typer.Option(False, "--refresh", "-r", help="Refresh repository metadata before checking"),
     source: Optional[str] = typer.Option(None, "--source", "-s", help="Filter check to a specific source (apt, flatpak, snap)"),
+    security_only: bool = typer.Option(False, "--security-only", help="Filter check to only Security and Critical updates"),
 ):
-    """Check for available updates across all supported sources."""
+    """Check for available updates across all supported sources concurrently."""
     orc = get_orchestrator()
-    with console.status("[bold cyan]Checking for available updates...[/bold cyan]"):
-        updates = orc.check_updates(refresh=refresh, source=source)
+    with console.status("[bold cyan]Checking for available updates concurrently...[/bold cyan]"):
+        detailed = orc.check_updates_detailed(refresh=refresh, source=source)
+        updates = detailed["updates"]
+        source_status = detailed.get("source_status", {})
+        is_cached = detailed.get("is_cached", False)
+        cache_age = detailed.get("cache_age_seconds", 0.0)
+
+    if security_only:
+        updates = [u for u in updates if is_security_only(getattr(u, "urgency", "Unknown"))]
+
+    if is_cached:
+        console.print(f"[dim]Showing cached results from {int(cache_age // 60)}m ago. Use --refresh to re-query upstream sources.[/dim]\n")
+    elif source_status:
+        for src, st in source_status.items():
+            if st["status"] == "success":
+                console.print(f"  • [cyan]{src.upper()}:[/cyan] {st['count']} updates found [dim]({st['elapsed']:.2f}s)[/dim]")
+            else:
+                console.print(f"  • [red]{src.upper()}:[/red] Failed: {st['error']} [dim]({st['elapsed']:.2f}s)[/dim]")
+        console.print("")
+
     print_updates_table(updates)
     if updates:
         dl_summary = orc.get_update_download_summary()
@@ -96,13 +116,17 @@ def check_cmd(
 def list_cmd(
     updates_only: bool = typer.Option(False, "--updates", "-u", help="Show only applications with available updates"),
     source: Optional[str] = typer.Option(None, "--source", "-s", help="Filter by source (apt, flatpak, snap)"),
+    security_only: bool = typer.Option(False, "--security-only", help="Filter to only Security and Critical updates"),
 ):
     """List installed applications or pending updates."""
     orc = get_orchestrator()
     if updates_only:
         upds = orc.repo.get_updates(source=source)
+        if security_only:
+            upds = [u for u in upds if is_security_only(u.get("urgency", "Unknown"))]
         if not upds:
-            console.print("[dim]No updates recorded. Run 'ulum check' to scan for new updates.[/dim]")
+            msg = "No security updates recorded." if security_only else "No updates recorded. Run 'ulum check' to scan for new updates."
+            console.print(f"[dim]{msg}[/dim]")
             return
         # Display simplified updates
         from ulum.core.models import ApplicationRecord, ScopeType, SourceType, UpdateRecord
@@ -116,6 +140,7 @@ def list_cmd(
                     installed_version=u["current_version"],
                 ),
                 available_version=u["available_version"],
+                urgency=u.get("urgency", "Unknown"),
             )
             for u in upds
         ]
@@ -149,12 +174,13 @@ def update_cmd(
     identifier: Optional[str] = typer.Argument(None, help="Target application ID to update"),
     all_packages: bool = typer.Option(False, "--all", "-a", help="Update all eligible packages across all sources"),
     source: Optional[str] = typer.Option(None, "--source", "-s", help="Update all packages for a specific source"),
+    security_only: bool = typer.Option(False, "--security-only", help="Update only Security and Critical updates"),
     dry_run: bool = typer.Option(False, "--dry-run", "-n", help="Simulate update without modifying the system"),
     yes: bool = typer.Option(False, "--yes", "-y", help="Skip interactive confirmation"),
 ):
     """Update a specific application, a single source, or all eligible software."""
-    if not identifier and not all_packages and not source:
-        console.print("[yellow]Please specify an application ID, --source <name>, or --all to proceed.[/yellow]")
+    if not identifier and not all_packages and not source and not security_only:
+        console.print("[yellow]Please specify an application ID, --source <name>, --security-only, or --all to proceed.[/yellow]")
         console.print("Run [bold]ulum update --help[/bold] for usage.")
         raise typer.Exit(code=1)
 
@@ -164,17 +190,29 @@ def update_cmd(
     if dry_run:
         console.print("[bold yellow]Running in DRY-RUN mode. No changes will be made.[/bold yellow]")
 
+    if security_only:
+        console.print("[bold cyan]Filtering exclusively to Security and Critical updates (APT-only in v0.4)...[/bold cyan]")
+
     dl_summary = orc.get_update_download_summary()
     if dl_summary["is_large_download"]:
         console.print(f"[bold yellow]⚠️ Metered Connection Warning:[/bold yellow] Large download of {dl_summary['formatted_size']} required.")
 
     if not yes and not dry_run:
-        target_desc = identifier or (f"all {source} packages" if source else "ALL eligible packages")
+        if security_only:
+            target_desc = "all pending SECURITY and CRITICAL packages"
+        else:
+            target_desc = identifier or (f"all {source} packages" if source else "ALL eligible packages")
         if not Confirm.ask(f"Proceed with updating {target_desc}?"):
             console.print("[dim]Update cancelled by user.[/dim]")
             raise typer.Exit(code=0)
 
-    results = orc.execute_updates(targets=targets, source=source, dry_run=dry_run)
+    results = orc.execute_updates(
+        targets=targets, source=source, security_only=security_only, dry_run=dry_run
+    )
+    if not results and security_only:
+        console.print("[green]✓ No pending security updates found.[/green]")
+        return
+
     for src, res in results:
         if res.success:
             console.print(f"[bold green]✓ {src.upper()} update succeeded.[/bold green]")
