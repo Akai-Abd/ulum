@@ -216,6 +216,17 @@ class AppImageAdapter(BaseAdapter):
         app_id = p.stem.lower()
         desktop_file = desktop_dir / f"appimage-{app_id}.desktop"
 
+        # Backup existing launcher if collision occurs
+        backup_path = None
+        if desktop_file.exists():
+            backup_file = desktop_dir / f"{desktop_file.name}.backup"
+            try:
+                shutil.copy2(desktop_file, backup_file)
+                backup_path = backup_file
+                logger.info("Backed up existing desktop entry to %s", backup_file)
+            except Exception as e:
+                logger.warning("Could not back up existing desktop entry: %s", e)
+
         display_name = re.sub(r"[-_]\d+\.\d+.*", "", p.stem).replace("-", " ").title() or app_id
 
         # Write clean standard .desktop file
@@ -247,6 +258,43 @@ X-AppImage-Version={p.stem}
                 pass
 
         return True, f"Successfully integrated '{display_name}' into desktop menu.", desktop_file
+
+    @classmethod
+    def unintegrate_appimage(cls, identifier: str) -> Tuple[bool, str]:
+        """Removes a generated .desktop launcher and restores backup if present."""
+        clean_id = identifier.replace("appimage:", "").replace(".desktop", "").replace("appimage-", "")
+        desktop_dir = cls.get_desktop_dir()
+        desktop_file = desktop_dir / f"appimage-{clean_id}.desktop"
+
+        if not desktop_file.exists():
+            direct_match = desktop_dir / f"{clean_id}.desktop"
+            if direct_match.exists():
+                desktop_file = direct_match
+            else:
+                return False, f"Desktop launcher for '{identifier}' not found in {desktop_dir}"
+
+        try:
+            desktop_file.unlink()
+            backup = desktop_dir / f"{desktop_file.name}.backup"
+            if backup.exists():
+                shutil.move(backup, desktop_file)
+                msg = f"Removed '{desktop_file.name}' and restored previous desktop configuration."
+            else:
+                msg = f"Successfully unintegrated '{desktop_file.name}' from desktop menu."
+
+            if shutil.which("update-desktop-database"):
+                try:
+                    subprocess.run(
+                        ["update-desktop-database", str(desktop_dir)],
+                        stdout=subprocess.DEVNULL,
+                        stderr=subprocess.DEVNULL,
+                        check=False,
+                    )
+                except Exception:
+                    pass
+            return True, msg
+        except Exception as e:
+            return False, f"Failed unintegrating {identifier}: {e}"
 
     @classmethod
     def find_unintegrated_appimages(cls) -> List[Path]:

@@ -1,6 +1,7 @@
 import os
 import platform
 import re
+import shutil
 from typing import Any, Dict, List, Optional, Set
 from ulum.cli.display import format_bytes
 from ulum.core.models import ExecutionResult
@@ -14,9 +15,34 @@ class KernelCleaner:
     @staticmethod
     def get_running_kernel() -> str:
         try:
-            return os.uname().release
+            rel = os.uname().release
+            return rel if rel else "unknown"
         except Exception:
-            return platform.release()
+            return platform.release() or "unknown"
+
+    @classmethod
+    def detect_snapshot_tool(cls) -> Optional[str]:
+        """Detects available snapshot tools on the system."""
+        if shutil.which("timeshift"):
+            return "timeshift"
+        if shutil.which("snapper"):
+            return "snapper"
+        if shutil.which("btrfs"):
+            return "btrfs"
+        return None
+
+    @classmethod
+    def check_dkms_modules(cls) -> List[str]:
+        """Checks for active DKMS kernel modules."""
+        if not command_exists("dkms"):
+            return []
+        try:
+            res = run_cmd(["dkms", "status"])
+            if res.returncode == 0 and res.stdout:
+                return [line.strip() for line in res.stdout.splitlines() if line.strip()]
+        except Exception:
+            pass
+        return []
 
     @classmethod
     def list_kernel_packages(cls) -> List[Dict[str, str]]:
@@ -70,6 +96,19 @@ class KernelCleaner:
     def plan_cleanup(cls) -> Dict[str, Any]:
         """Builds a kernel cleanup plan preserving the active and latest fallback kernel."""
         running = cls.get_running_kernel()
+        if not running or running == "unknown":
+            return {
+                "running_kernel": "unknown",
+                "kept_kernels": [],
+                "removable_kernels": [],
+                "packages_to_remove": [],
+                "residual_packages": [],
+                "estimated_freed_bytes": 0,
+                "formatted_freed": "0 B",
+                "is_safe": False,
+                "safety_error": "Cannot detect running kernel release. Aborting cleanup.",
+            }
+
         raw_pkgs = cls.list_kernel_packages()
 
         # Group installed image packages by release
@@ -98,17 +137,15 @@ class KernelCleaner:
         sorted_releases = sorted(installed_releases.keys(), key=release_key)
 
         # Active kernel must NEVER be removed
-        # Running might be '6.8.0-151-generic', release could match or be prefix
         kept_releases: Set[str] = set()
         for r in sorted_releases:
             if r == running or running.startswith(r) or r.startswith(running.split("-")[0]):
                 if r == running or f"{r}-generic" == running or running.startswith(r):
                     kept_releases.add(r)
 
-        # If running wasn't matched explicitly, ensure exact running release is protected
         kept_releases.add(running)
 
-        # Also keep the newest installed non-running release as fallback
+        # Also keep the newest installed non-running release as fallback (enforcing 2-kernel minimum)
         non_running_installed = [r for r in sorted_releases if r not in kept_releases]
         if non_running_installed:
             latest_fallback = non_running_installed[-1]
@@ -134,6 +171,27 @@ class KernelCleaner:
         if total_freed_bytes == 0 and removable_releases:
             total_freed_bytes = len(removable_releases) * 450 * 1024 * 1024
 
+        # Check DKMS modules
+        dkms_modules = cls.check_dkms_modules()
+        dkms_warnings = []
+        for mod in dkms_modules:
+            for rem in removable_releases:
+                if rem in mod:
+                    dkms_warnings.append(f"DKMS module '{mod}' references removable kernel {rem}")
+
+        # Check snapshot tool
+        snapshot_tool = cls.detect_snapshot_tool()
+
+        # 2-kernel minimum guard: if total installed kernel count would drop below 2
+        total_images = len(installed_images) if installed_images else len(installed_releases)
+        leaves_fewer_than_two = total_images > 1 and len(kept_releases) < 2
+
+        is_safe = (
+            running not in removable_releases
+            and len(packages_to_remove) > 0
+            and not leaves_fewer_than_two
+        )
+
         return {
             "running_kernel": running,
             "kept_kernels": sorted(list(kept_releases)),
@@ -142,12 +200,23 @@ class KernelCleaner:
             "residual_packages": [p["package"] for p in residual_pkgs],
             "estimated_freed_bytes": total_freed_bytes,
             "formatted_freed": format_bytes(total_freed_bytes),
-            "is_safe": running not in removable_releases and len(packages_to_remove) > 0,
+            "snapshot_tool": snapshot_tool,
+            "snapshot_recommended": snapshot_tool is not None,
+            "dkms_warnings": dkms_warnings,
+            "is_safe": is_safe,
         }
 
     @classmethod
     def execute_cleanup(cls, plan: Dict[str, Any], dry_run: bool = False) -> ExecutionResult:
         """Executes purge of unneeded kernel packages."""
+        if not plan.get("is_safe", True) and not dry_run:
+            return ExecutionResult(
+                success=False,
+                exit_code=1,
+                stderr=plan.get("safety_error", "Plan rejected by safety guard: cannot guarantee 2 surviving kernels."),
+                error_summary="Aborted: safety guard rejected kernel plan",
+            )
+
         pkgs = plan.get("packages_to_remove", [])
         if not pkgs:
             return ExecutionResult(success=True, exit_code=0, stdout="No obsolete kernels to remove.")
@@ -174,11 +243,20 @@ class KernelCleaner:
         cmd = ["apt-get", "purge", "-y"] + pkgs
         logger.info("Purging %d obsolete kernel packages...", len(pkgs))
         res = run_cmd(cmd, require_root=True, env={"DEBIAN_FRONTEND": "noninteractive"})
+
+        err_summary = None
+        if res.returncode != 0:
+            err_summary = (
+                f"CRITICAL WARNING: Kernel purge failed halfway (exit code {res.returncode})! "
+                "Do NOT reboot until fixed. Run 'sudo apt-get install -f' or reinstall kernel."
+            )
+            logger.error(err_summary)
+
         return ExecutionResult(
             success=(res.returncode == 0),
             exit_code=res.returncode,
             stdout=res.stdout,
             stderr=res.stderr,
             removed_items=pkgs if res.returncode == 0 else [],
-            error_summary=res.stderr if res.returncode != 0 else None,
+            error_summary=err_summary or (res.stderr if res.returncode != 0 else None),
         )

@@ -2,8 +2,8 @@
 # Universal Linux Update Manager (ULUM)
 
 **Document version:** 0.4.0  
-**Status:** In Progress (v0.4.0 Database Schema & Migrations Implemented)  
-**Product type:** Open-source Linux CLI utility and Modern GTK3/WebKit2 Desktop GUI  
+**Status:** Complete (v0.4.0 Implemented & Verified)  
+**Product type:** Open-source Linux CLI utility and Modern Native GTK Desktop GUI  
 **Initial target platforms:** Linux Mint 22.x and Ubuntu 24.04 LTS  
 **Primary implementation language:** Python 3.12+  
 **Proposed command:** `ulum` (CLI) / `ulum-gui` (GUI)
@@ -356,6 +356,40 @@ Notifications must be opt-in or configurable and must not execute updates or rem
 - Tags packages originating from `-security` pockets (e.g. `noble-security`) with `urgency = "Security"`.
 - Allows upgrading only security-critical packages via `ulum update --security-only` without requiring a full distribution or bulk package upgrade.
 
+### 7.15 P0 safety hardening for system modifications (v0.4.0)
+
+- **AptRepoDoctor**: Automatic creation of pre-modification backups (`<file>.ulum-backup-<timestamp>`) before modifying any repo file, path allow-list enforcement restricted to `/etc/apt/sources.list*`, and 1-click restore (`ulum doctor --restore-repos`).
+- **KernelCleaner**: Active booted kernel (`uname -r`) guard, strict minimum 2-kernel safety rule (running kernel + newest fallback) preventing unbootable systems, compiled DKMS driver inspection and warning, Timeshift/Snapper snapshot detection, and recovery instructions on partial purge failures.
+- **SelfUpdater**: Cryptographic SHA256 checksum verification before installing release binaries/packages, local rollback preservation in `~/.local/share/ulum/rollback/`, and post-install launch smoke test.
+- **AppImage Integration**: Collision detection and `.desktop.backup` preservation, path validation, and launcher unintegration (`ulum integrate --remove <id>`).
+
+### 7.16 Comprehensive 8-point health diagnostics model v2 (`SystemDoctor`) (v0.4.0)
+
+- Structured diagnostic inspection executing 8 ordered health checks:
+  1. Distribution, kernel, architecture, and platform compatibility.
+  2. Package manager availability (APT, Flatpak, Snap, AppImage).
+  3. Repository health (active source counting, syntax checks, disabled entries).
+  4. `/boot` partition storage and kernel inventory (critical alert if < 100 MB).
+  5. SQLite database health, schema version (v2), and integrity check.
+  6. Package manager lock health (active holding PIDs vs dead/stale lock files).
+  7. Inventory scan freshness (checks if scan is older than 24h or missing).
+  8. ULUM version and GitHub release check.
+- Standardized exit codes (0 = healthy/degraded, 1 = failure, 2 = missing dependency) and pure JSON output (`ulum doctor --json`).
+- Automated stale lock clearing (`ulum doctor --fix`) removing locks only if holding PID is dead, alongside `dpkg --configure -a` and `apt-get install -f -y`.
+
+### 7.17 Native desktop GUI & transparent health score (v0.4.0)
+
+- Replaces embedded WebKit2 browser with an instant, native GTK desktop application with 7 dedicated views: Home (Bento Dashboard), Updates, Installed, Leftovers, Diagnostics, History, and Settings.
+- Transparent 0-100 Health Score starting at 100 with itemized, visible deductions per PRD §6.3:
+  - Pending Security updates (-5 pts each, max -30)
+  - Pending Critical updates (-4 pts each, max -20)
+  - Broken/404 repositories (-10 to -20 pts)
+  - `/boot` storage pressure (-10 pts)
+  - Stale locks (-10 pts)
+  - Stale scan (-10 pts)
+  - Verified leftovers > 1 GB (-5 pts)
+- Prominent disclosure on Home and Updates views: *"Security urgency tagging is APT-only in v0.4"*.
+
 ## 8. CLI command specification
 
 Proposed executable: `ulum`
@@ -372,7 +406,7 @@ Proposed executable: `ulum`
 | `ulum update --security-only` | Update only Security and Critical updates (APT-only in v0.4) |
 | `ulum update --source apt` | Update through one source |
 | `ulum update <identifier>` | Update a selected application |
-| `ulum integrate [path] [--all]` | Register standalone AppImages into system desktop menu |
+| `ulum integrate [path] [--all] [--remove <id>]` | Register standalone AppImages into system desktop menu or remove launchers |
 | `ulum remove <identifier>` | Start standard uninstall |
 | `ulum remove <identifier> --complete` | Build a complete-removal plan |
 | `ulum remove <identifier> --dry-run` | Preview removal without changing the system |
@@ -384,7 +418,7 @@ Proposed executable: `ulum`
 | `ulum removal-history` | Show removal history |
 | `ulum exclude <identifier>` | Exclude an application from bulk operations |
 | `ulum config` | View or edit configuration |
-| `ulum doctor [--fix] [--fix-repos]` | Diagnose health, repair interrupted locks, and disable 404 PPAs |
+| `ulum doctor [--fix] [--fix-repos] [--restore-repos] [--json]` | Diagnose health, repair locks, disable 404 PPAs, restore repo backups, and emit structured JSON |
 | `ulum self-update [--check]` | Check for new ULUM releases on GitHub and apply updates |
 | `ulum version` | Show ULUM version |
 

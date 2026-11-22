@@ -157,3 +157,119 @@ def test_self_updater_mock():
         assert res["update_available"] is True
         assert res["latest_version"] == "0.9.9"
         assert res["deb_filename"] == "ulum_0.9.9_all.deb"
+
+
+def test_apt_repo_doctor_backup_and_restore(tmp_path: Path, monkeypatch):
+    sources_dir = tmp_path / "sources.list.d"
+    sources_dir.mkdir()
+    sources_file = sources_dir / "broken.list"
+    original_text = "deb http://ppa.launchpad.net/dead/ppa/ubuntu noble main\n"
+    sources_file.write_text(original_text, encoding="utf-8")
+
+    monkeypatch.setattr(AptRepoDoctor, "SOURCES_DIR", sources_dir)
+    monkeypatch.setattr(AptRepoDoctor, "PRIMARY_SOURCES", tmp_path / "sources.list")
+
+    entry = {
+        "file": str(sources_file),
+        "line_number": 1,
+        "reason": "404 Not Found",
+        "file_type": "list",
+    }
+
+    # Disable entry
+    ok, msg = AptRepoDoctor.disable_broken_entry(entry, dry_run=False)
+    assert ok
+    assert "# DISABLED BY ULUM" in sources_file.read_text(encoding="utf-8")
+
+    # Verify backup exists
+    backups = list(sources_dir.glob("broken.list.ulum-backup-*"))
+    assert len(backups) == 1
+    assert backups[0].read_text(encoding="utf-8") == original_text
+
+    # Restore backups
+    res = AptRepoDoctor.restore_all_backups()
+    assert res["restored_count"] >= 1
+    assert sources_file.read_text(encoding="utf-8") == original_text
+
+
+def test_apt_repo_doctor_allow_list(tmp_path: Path, monkeypatch):
+    sources_file = tmp_path / "test.list"
+    sources_file.write_text("deb http://ppa.launchpad.net/myppa/ubuntu noble main\n", encoding="utf-8")
+    monkeypatch.setattr(AptRepoDoctor, "SOURCES_DIR", tmp_path)
+    monkeypatch.setattr(AptRepoDoctor, "PRIMARY_SOURCES", tmp_path / "dummy.list")
+
+    broken_urls = [{"url": "http://ppa.launchpad.net/myppa/ubuntu", "reason": "404 Not Found"}]
+    # Without allow-list: matched
+    matched = AptRepoDoctor.find_source_files_for_urls(broken_urls, allow_list=[])
+    assert len(matched) == 1
+
+    # With allow-list: ignored
+    matched_allowed = AptRepoDoctor.find_source_files_for_urls(broken_urls, allow_list=["myppa"])
+    assert len(matched_allowed) == 0
+
+
+def test_kernel_cleaner_unknown_kernel_abort(monkeypatch):
+    monkeypatch.setattr(KernelCleaner, "get_running_kernel", lambda: "unknown")
+    plan = KernelCleaner.plan_cleanup()
+    assert plan["is_safe"] is False
+    assert "Cannot detect running kernel" in plan["safety_error"]
+
+
+def test_kernel_cleaner_snapshot_and_dkms(monkeypatch):
+    monkeypatch.setattr(KernelCleaner, "detect_snapshot_tool", classmethod(lambda cls: "timeshift"))
+    monkeypatch.setattr(KernelCleaner, "check_dkms_modules", classmethod(lambda cls: ["nvidia/535.183.01, 6.8.0-140-generic"]))
+
+    mock_packages = [
+        {"package": "linux-image-6.8.0-151-generic", "version": "6.8.0-151", "status": "install ok installed", "size_bytes": 100000000},
+        {"package": "linux-image-6.8.0-149-generic", "version": "6.8.0-149", "status": "install ok installed", "size_bytes": 100000000},
+        {"package": "linux-image-6.8.0-140-generic", "version": "6.8.0-140", "status": "install ok installed", "size_bytes": 100000000},
+    ]
+
+    with patch.object(KernelCleaner, "get_running_kernel", return_value="6.8.0-151-generic"), \
+         patch.object(KernelCleaner, "list_kernel_packages", return_value=mock_packages):
+        plan = KernelCleaner.plan_cleanup()
+        assert plan["snapshot_tool"] == "timeshift"
+        assert plan["snapshot_recommended"] is True
+        assert len(plan["dkms_warnings"]) == 1
+        assert "6.8.0-140-generic" in plan["dkms_warnings"][0]
+
+
+def test_appimage_unintegrate(tmp_path: Path, monkeypatch):
+    app_bin = tmp_path / "myapp.AppImage"
+    app_bin.write_text("#!/bin/sh\n")
+    desktop_dir = tmp_path / "applications"
+    monkeypatch.setattr(AppImageAdapter, "get_desktop_dir", classmethod(lambda cls: desktop_dir))
+
+    # Integrate first
+    ok, msg, dfile = AppImageAdapter.integrate_appimage(app_bin)
+    assert ok
+    assert dfile.exists()
+
+    # Unintegrate
+    un_ok, un_msg = AppImageAdapter.unintegrate_appimage("myapp")
+    assert un_ok
+    assert not dfile.exists()
+
+
+def test_self_updater_sha256_verification(tmp_path: Path, monkeypatch):
+    import hashlib
+    fake_deb = tmp_path / "fake.deb"
+    fake_content = b"package-binary-data" * 100
+    fake_deb.write_bytes(fake_content)
+    real_sha = hashlib.sha256(fake_content).hexdigest()
+
+    # Test 1: Refuse when require_sha256 is True but no checksum provided
+    res1 = SelfUpdater.apply_update("https://example.com/deb.deb", expected_sha256=None, require_sha256=True)
+    assert not res1.success
+    assert "SHA256 checksum is mandatory" in res1.stderr
+
+    # Test 2: Mismatch aborts
+    mock_resp = MagicMock()
+    mock_resp.read.return_value = fake_content
+    mock_resp.__enter__.return_value = mock_resp
+
+    with patch("urllib.request.urlopen", return_value=mock_resp):
+        res2 = SelfUpdater.apply_update("https://example.com/deb.deb", expected_sha256="wronghash00000000000000000000000000000000000000000000000000000000")
+        assert not res2.success
+        assert "mismatch" in res2.stderr
+

@@ -5,7 +5,7 @@
 [![Python Version](https://img.shields.io/badge/python-3.12%2B-blue.svg?style=flat-square&logo=python)](https://www.python.org/)
 [![Platform](https://img.shields.io/badge/platform-Linux%20(Mint%20%7C%20Ubuntu)-orange.svg?style=flat-square&logo=linux)](https://github.com/Akai-Abd/ulum)
 [![Package Managers](https://img.shields.io/badge/sources-APT%20%7C%20Flatpak%20%7C%20Snap%20%7C%20AppImage-success.svg?style=flat-square)](https://github.com/Akai-Abd/ulum)
-[![GUI](https://img.shields.io/badge/GUI-GTK3%20%2B%20WebKit2%20Dashboard-purple.svg?style=flat-square)](https://github.com/Akai-Abd/ulum)
+[![GUI](https://img.shields.io/badge/GUI-Native%20GTK%20Dashboard-purple.svg?style=flat-square)](https://github.com/Akai-Abd/ulum)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg?style=flat-square)](LICENSE)
 [![Built by](https://img.shields.io/badge/Built%20by-Abdurrahman-7c3aed.svg?style=flat-square&logo=github)](https://github.com/Akai-Abd)
 
@@ -33,7 +33,9 @@ Seamlessly orchestrate software updates and clean removals across **APT**, **Fla
 - **Scheduled Background Updates**: Native user-level systemd timer and desktop notifications (`ulum schedule --install`).
 - **Safe Application Removal**: Complete and standard uninstallation workflows powered by native package managers with dependency analysis and reverse-dependency protection.
 - **Residual Leftover Detection**: Scans `~/.var/app`, `~/snap`, `~/.config`, and `~/.cache` for orphaned folders and configuration files left behind after uninstalls, with built-in system directory protection.
-- **Modern Glassmorphic Desktop GUI**: Dark-mode glassmorphic dashboard built with GTK3 and embedded WebKit2 backed by a threaded asynchronous server.
+- **Native Desktop GUI**: Fast, responsive desktop dashboard built with native GTK widgets featuring 7 dedicated views, transparent Health Score breakdown (0-100), and instant startup without webview or browser engine overhead.
+- **P0 Safety Hardening**: Pre-modification repo backups with 1-click restore (`ulum doctor --restore-repos`), strict 2-kernel minimum check with DKMS & snapshot warnings, SHA256 checksum verification on self-updates, and AppImage unintegration (`ulum integrate --remove <id>`).
+- **Comprehensive 8-Point Health Diagnostics (`ulum doctor [--json]`)**: Full-system health audit inspecting OS distribution, package managers, repository health, `/boot` partition, SQLite schema integrity, stale lock resolution, inventory scan freshness, and release updates.
 - **Native Dependency Inspection**: Inspect package dependencies and installed reverse-dependencies before modifying the system.
 - **Local SQLite Tracking**: Maintains a persistent local inventory and auditable history of updates, removals, and discovered cleanup candidates.
 - **Dry-Run Simulation**: Preview exactly what packages will be updated or deleted before making any changes.
@@ -65,7 +67,7 @@ Seamlessly orchestrate software updates and clean removals across **APT**, **Fla
 
 - Linux (Ubuntu 24.04+ or Linux Mint 22+)
 - Python 3.12 or newer
-- GTK3 and WebKit2 (`gir1.2-webkit2-4.1` for desktop GUI)
+- GTK3 (`gir1.2-gtk-3.0` for native desktop GUI)
 
 ### 1. Installation
 
@@ -74,9 +76,9 @@ Seamlessly orchestrate software updates and clean removals across **APT**, **Fla
 Install the pre-built `.deb` package directly:
 
 ```bash
-sudo dpkg -i ulum_0.3.0_all.deb
+sudo dpkg -i ulum_0.4.0_all.deb
 # Or from the repository root:
-sudo dpkg -i dist/ulum_0.3.0_all.deb
+sudo dpkg -i dist/ulum_0.4.0_all.deb
 ```
 
 #### Option B: From Source (Development)
@@ -99,20 +101,18 @@ ulum doctor
 ```
 
 ```text
-Running ULUM Health Diagnostics...
+Running ULUM Health Diagnostics (8-Point Checklist)...
 
-Distribution: Linux Mint 22.3
-Supported Platform: Yes
+✓ 1. Distribution & Kernel: Ubuntu 24.04 (x86_64, Linux 6.8.0-49-generic) [Supported]
+✓ 2. Package Managers: Available: APT, FLATPAK, SNAP, APPIMAGE
+✓ 3. Repository Health: 24 active sources across 6 files
+✓ 4. /boot Partition & Kernel Health: 480 MB free (48.0%), 3 kernels installed (Booted: 6.8.0-49-generic)
+✓ 5. Database Storage: ~/.local/share/ulum/ulum.db (Schema v2, 64.0 KB, Integrity: OK)
+✓ 6. Package Manager Locks: No active or stale package manager locks detected
+✓ 7. Inventory & Scan Freshness: Inventory scan completed 0.4 hours ago
+✓ 8. ULUM Version & Updates: v0.4.0 (Up to date)
 
-Package Managers:
-  • APT: Available
-  • FLATPAK: Available
-  • SNAP: Available
-
-Database Storage: ~/.local/share/ulum/ulum.db (Writable)
-Privilege Escalation (sudo/root): OK
-
-✓ Diagnostic check complete.
+✓ All diagnostic checks passed (System Healthy).
 ```
 
 ---
@@ -121,7 +121,7 @@ Privilege Escalation (sudo/root): OK
 
 | Command | Description |
 | :--- | :--- |
-| `ulum doctor [--fix] [--fix-repos]` | Diagnose distro compatibility, package managers, and storage health (auto-repairs dpkg/locks or disables broken 404 PPAs). |
+| `ulum doctor [--fix] [--fix-repos] [--restore-repos] [--json]` | Diagnose system health across the 8-point checklist (repairs stale locks/dpkg, disables broken 404 PPAs, restores backups, or outputs structured JSON). |
 | `ulum scan` | Index all installed packages across APT, Flatpak, Snap, and AppImage into local inventory. |
 | `ulum check [--refresh]` | Query available updates across all active package managers with estimated download sizes. |
 | `ulum list [--updates]` | Display installed applications or pending updates in rich tables. |
@@ -131,7 +131,7 @@ Privilege Escalation (sudo/root): OK
 | `ulum update <id>` | Update a specific application through its native manager. |
 | `ulum update --dry-run` | Preview proposed updates without modifying the system. |
 | `ulum schedule [--install]` | Configure systemd automated background update checks and desktop notifications. |
-| `ulum integrate [path] [--all]` | Register standalone AppImages into desktop application menu and application launcher. |
+| `ulum integrate [path] [--all] [--remove <id>]` | Register standalone AppImages into desktop application menu or cleanly unintegrate/remove existing launchers. |
 | `ulum remove <id>` | Perform standard native uninstallation. |
 | `ulum remove <id> --complete` | Complete removal (purge configs and verified application data). |
 | `ulum leftovers` | Discover orphaned residual configuration and data directories. |
@@ -154,12 +154,13 @@ ulum gui
 ./run_gui.sh
 ```
 
-- **Live Updates Tab**: View pending updates across all sources, see total estimated download sizes (with amber warnings if > 1 GB), and update individually or in bulk.
+- **Home (Bento Dashboard)**: Live 0-100 Health Score with itemized deduction breakdowns, updates count by urgency (Security, Critical, Feature, Unknown) with "Security tagging is APT-only in v0.4" notice, 1-click "Update Security Only", `/boot` partition storage monitor, repository health, and recent operations history.
+- **Live Updates Tab**: View pending updates across all sources, filter by urgency, see total estimated download sizes (with amber warnings if > 1 GB), and update security-only, individually, or in bulk.
 - **Installed Software Tab**: Search, filter by source, inspect dependencies, trigger standard and complete uninstalls, and 1-click **Integrate AppImages** into your desktop menu.
 - **Leftovers & Cleanup Tab**: Browse residual directories with confidence ratings and 1-click **Clean Old Kernels** to free `/boot` space.
-- **Diagnostics Popover**: View package manager health and 1-click **Fix 404 Repos** to safely comment out dead PPAs.
-- **Operation History Tab**: Track past system operations, exit codes, and timestamps.
-- **Settings Tab**: Toggle package managers, exclude packages from auto-updates, configure confirmation prompts, and use the **ULUM Application Updates** card to check GitHub and upgrade ULUM directly in-app.
+- **Diagnostics Tab (System Doctor)**: Interactive live 8-point checklist view with 1-click **Fix 404 Repos**, **Restore Repo Backups**, and **Repair Stale Locks**.
+- **Operation History Tab**: Track past system operations (updates, removals, repo fixes, kernel cleans, integrations, self-updates), exit codes, and timestamps.
+- **Settings Tab**: View environment details, configure package managers, and use the **ULUM Application Updates** card to check GitHub releases, verify SHA256 checksums, and manage rollback binaries.
 
 > [!NOTE]
 > When launched from the application launcher or via `ulum-gui`, ULUM uses PolicyKit (`pkexec`) to prompt for administrative authorization once. The dashboard runs in **Root Administrator** mode with X11 display access forwarding, enabling seamless in-app package downloads and installations while preserving the user's database inventory.
@@ -191,16 +192,17 @@ pytest -v
 tests/integration/test_cli.py ......
 tests/unit/test_adapters.py .......
 tests/unit/test_db.py ........
+tests/unit/test_doctor.py ..........
 tests/unit/test_executor.py ......
-tests/unit/test_gui.py .
+tests/unit/test_gui.py s.
 tests/unit/test_leftovers.py ...
-tests/unit/test_new_features.py .........
+tests/unit/test_new_features.py ...............
 tests/unit/test_planner.py ...
 tests/unit/test_safety.py .....
 tests/unit/test_server.py .
 tests/unit/test_system_and_config.py ...
 
-============================== 52 passed ==============================
+======================== 68 passed, 1 skipped ========================
 ```
 
 ---

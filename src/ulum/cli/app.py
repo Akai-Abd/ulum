@@ -284,6 +284,17 @@ def cleanup_cmd(
         plan = KernelCleaner.plan_cleanup()
         console.print(f"  • Running Kernel: [bold green]{plan['running_kernel']}[/bold green] (Protected)")
         console.print(f"  • Kept Kernels: [green]{', '.join(plan['kept_kernels'])}[/green]")
+
+        if plan.get("snapshot_recommended"):
+            console.print(f"  • Snapshot Tool: [cyan]{plan['snapshot_tool'].capitalize()}[/cyan] detected (pre-cleanup snapshot available)")
+
+        for w in plan.get("dkms_warnings", []):
+            console.print(f"  • [yellow]DKMS Warning:[/yellow] {w}")
+
+        if not plan.get("is_safe", True) and plan.get("safety_error"):
+            console.print(f"[bold red]Action aborted by safety guard:[/bold red] {plan['safety_error']}")
+            return
+
         if not plan["packages_to_remove"]:
             console.print("[green]✓ System is clean. No obsolete kernels found.[/green]")
             return
@@ -380,25 +391,45 @@ def removal_history_cmd(limit: int = typer.Option(20, "--limit", "-l", help="Num
 def doctor_cmd(
     fix: bool = typer.Option(False, "--fix", "-f", help="Attempt automatic repair of interrupted dpkg/apt locks and state"),
     fix_repos: bool = typer.Option(False, "--fix-repos", help="Scan for and disable broken or 404 APT repositories"),
+    restore_repos: bool = typer.Option(False, "--restore-repos", help="Restore all disabled APT repositories from their safety backups"),
+    json_output: bool = typer.Option(False, "--json", help="Output health diagnostic report in JSON format"),
 ):
     """Diagnose system compatibility, package managers, and database health."""
-    console.print("[bold cyan]Running ULUM Health Diagnostics...[/bold cyan]\n")
-    info = get_system_info()
-    console.print(f"Distribution: {info.distro_name} {info.distro_version}")
-    console.print(f"Supported Platform: {'[green]Yes[/green]' if info.is_supported else '[yellow]Untested/Experimental[/yellow]'}")
+    from ulum.doctor.health import SystemDoctor
 
-    mgrs = detect_package_managers()
-    console.print("\nPackage Managers:")
-    for name, ok in mgrs.items():
-        console.print(f"  • {name.upper()}: {'[green]Available[/green]' if ok else '[dim]Not Found[/dim]'}")
+    report = SystemDoctor.run_all_checks()
 
-    db_path = get_db_path()
-    console.print(f"\nDatabase Storage: {db_path} ([green]Writable[/green])")
-    
-    # Check permissions
-    from ulum.utils.process import command_exists, is_root
-    sudo_ok = is_root() or command_exists("sudo")
-    console.print(f"Privilege Escalation (sudo/root): {'[green]OK[/green]' if sudo_ok else '[red]Missing sudo[/red]'}")
+    if json_output:
+        import sys
+        sys.stdout.write(report.to_json() + "\n")
+        sys.stdout.flush()
+        if report.exit_code != 0:
+            raise typer.Exit(code=report.exit_code)
+        return
+
+    console.print("[bold cyan]Running ULUM Health Diagnostics (8-Point Checklist)...[/bold cyan]\n")
+
+    for i, check in enumerate(report.checks, 1):
+        if check.status == "ok":
+            icon = "[bold green]✓[/bold green]"
+            style = "green"
+        elif check.status == "warn":
+            icon = "[bold yellow]![/bold yellow]"
+            style = "yellow"
+        else:
+            icon = "[bold red]✗[/bold red]"
+            style = "red"
+        console.print(f"{icon} [bold]{i}. {check.title}:[/bold] [{style}]{check.message}[/{style}]")
+
+    if restore_repos:
+        console.print("\n[bold yellow]Restoring APT repository configurations from safety backups...[/bold yellow]")
+        rest_res = AptRepoDoctor.restore_all_backups()
+        if rest_res["restored_count"] == 0:
+            console.print("[dim]No repository backup files found to restore.[/dim]")
+        else:
+            console.print(f"[bold green]✓ Restored {rest_res['restored_count']} repository source file(s):[/bold green]")
+            for r in rest_res["restored_files"]:
+                console.print(f"  • Restored [cyan]{Path(r['target']).name}[/cyan] from backup")
 
     if fix or fix_repos:
         if fix_repos:
@@ -410,23 +441,26 @@ def doctor_cmd(
                 console.print(f"[bold green]✓ Disabled {repo_res['disabled_count']} broken/404 repository entry(s):[/bold green]")
                 for d in repo_res["disabled_entries"]:
                     console.print(f"  • Disabled in [cyan]{Path(d['file']).name}:{d['line_number']}[/cyan] ({d['reason']})")
+                    if d.get("backup_path"):
+                        console.print(f"    [dim]Safety backup created at: {d['backup_path']}[/dim]")
 
         if fix:
-            console.print("\n[bold yellow]Attempting automated package manager recovery...[/bold yellow]")
-            from ulum.utils.process import command_exists, run_cmd
-            if command_exists("dpkg") and command_exists("apt-get"):
-                try:
-                    console.print("  • Configuring pending packages (dpkg --configure -a)...")
-                    run_cmd(["dpkg", "--configure", "-a"], require_root=True)
-                    console.print("  • Resolving broken dependencies (apt-get install -f)...")
-                    run_cmd(["apt-get", "install", "-f", "-y"], require_root=True)
-                    console.print("[bold green]✓ Automated recovery tasks completed successfully.[/bold green]")
-                except Exception as e:
-                    console.print(f"[bold red]Recovery encountered an error:[/bold red] {e}")
-            else:
-                console.print("[yellow]Automated recovery is currently only available for Debian/Ubuntu (APT) systems.[/yellow]")
+            console.print("\n[bold yellow]Attempting automated package manager recovery & stale lock repair...[/bold yellow]")
+            fix_res = SystemDoctor.repair_stale_locks()
+            if fix_res["removed_stale_locks"]:
+                console.print(f"[bold green]✓ Removed {len(fix_res['removed_stale_locks'])} stale package lock(s).[/bold green]")
+            if fix_res["dpkg_configured"]:
+                console.print("[bold green]✓ Configured unconfigured packages (dpkg --configure -a).[/bold green]")
+            if fix_res["apt_fixed"]:
+                console.print("[bold green]✓ Repaired broken dependencies (apt-get install -f).[/bold green]")
 
-    console.print("\n[bold green]✓ Diagnostic check complete.[/bold green]")
+    if report.overall_status == "healthy":
+        console.print("\n[bold green]✓ All diagnostic checks passed (System Healthy).[/bold green]")
+    elif report.overall_status == "degraded":
+        console.print("\n[bold yellow]! Diagnostic check completed with warnings (System Degraded).[/bold yellow]")
+    else:
+        console.print(f"\n[bold red]✗ Diagnostic check failed ({len(report.failing_checks)} checks failed: {', '.join(report.failing_checks)}).[/bold red]")
+        raise typer.Exit(code=1)
 
 @app.command("schedule")
 def schedule_cmd(
@@ -490,9 +524,17 @@ WantedBy=timers.target
 def integrate_cmd(
     path: Optional[str] = typer.Argument(None, help="Path to AppImage file to integrate into desktop launcher"),
     all_appimages: bool = typer.Option(False, "--all", "-a", help="Scan and integrate all unintegrated AppImages"),
+    remove: Optional[str] = typer.Option(None, "--remove", help="Remove an integrated desktop launcher entry"),
 ):
     """Integrate standalone AppImage applications into desktop start menu and launcher."""
-    if path:
+    if remove:
+        ok, msg = AppImageAdapter.unintegrate_appimage(remove)
+        if ok:
+            console.print(f"[bold green]✓ {msg}[/bold green]")
+        else:
+            console.print(f"[bold red]✗ {msg}[/bold red]")
+            raise typer.Exit(code=1)
+    elif path:
         p = Path(path)
         ok, msg, dfile = AppImageAdapter.integrate_appimage(p)
         if ok:
@@ -541,6 +583,8 @@ def self_update_cmd(
     console.print(f"\n[bold yellow]★ New Version Available: {res['tag_name']}[/bold yellow]")
     if res.get("deb_filename"):
         console.print(f"Package: [cyan]{res['deb_filename']}[/cyan]")
+    if res.get("sha256"):
+        console.print(f"Checksum SHA256: [cyan]{res['sha256']}[/cyan]")
     if res.get("release_url"):
         console.print(f"Release URL: {res['release_url']}")
 
@@ -557,8 +601,12 @@ def self_update_cmd(
             console.print("[dim]Update cancelled.[/dim]")
             return
 
-    with console.status(f"[bold green]Downloading and installing ULUM {res['tag_name']}...[/bold green]"):
-        install_res = SelfUpdater.apply_update(deb_url)
+    with console.status(f"[bold green]Downloading, verifying, and installing ULUM {res['tag_name']}...[/bold green]"):
+        install_res = SelfUpdater.apply_update(
+            deb_url,
+            expected_sha256=res.get("sha256"),
+            require_sha256=bool(res.get("sha256")),
+        )
 
     if install_res.success:
         console.print(f"[bold green]✓ Successfully upgraded ULUM to {res['tag_name']}![/bold green]")

@@ -9,6 +9,66 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [0.4.0] - 2026-11-23
 
+### 🖥️ Native Desktop GUI Modernization (v0.4.0 Step 5)
+
+- **Native GTK Desktop Application (`src/ulum/gui/window.py`)**:
+  - Replaced the embedded WebKit2 browser and local HTTP server architecture with an instant, native GTK desktop interface, removing browser engine startup overhead and eliminating X11/DMABUF driver instability.
+  - Implemented 7 structured views matching PRD §6.4: Home (Bento Dashboard), Updates, Installed Software, Leftovers & Cleanup, Diagnostics (Doctor), History, and Settings & About.
+- **Bento Home Dashboard & Transparent Health Score Engine (`calculate_health_score`)**:
+  - Quantitative 0-100 Health Score starting at 100 with itemized, visible deductions per PRD §6.3:
+    - Pending Security updates (-5 pts each, max -30)
+    - Pending Critical updates (-4 pts each, max -20)
+    - Repository health issues and 404 dead PPAs (-10 to -20 pts)
+    - `/boot` partition storage pressure (-10 pts)
+    - Stale package manager locks (-10 pts)
+    - Unscanned inventory older than 24h (-10 pts)
+    - Verified cleanup leftovers exceeding 1 GB (-5 pts)
+  - Updates by Urgency card with prominent disclosure: "Security urgency tagging is APT-only in v0.4".
+  - 1-click quick action buttons: "Update Security Only", "Clean Old Kernels", "Fix 404 Repos", and "Review Leftovers".
+- **Integrated Diagnostics & Settings**:
+  - Live 8-point checklist view in the Diagnostics tab with 1-click PPA repair, repo backup restoration, and stale lock clearing.
+  - Self-updater control card in Settings with release notes inspection and rollback execution.
+
+### 🩺 Unified Health Doctor CLI & Health Model v2 (v0.4.0 Step 4)
+
+- **Comprehensive 8-Point Health Checklist (`src/ulum/doctor/health.py`)**:
+  - Implemented `SystemDoctor` executing the complete PRD §12 diagnostic checklist in strict sequence:
+    1. Distribution, kernel, and architecture detection with supported platform verification.
+    2. Package manager availability (APT, Flatpak, Snap, AppImage).
+    3. Repository health (active source counting, syntax validation, and disabled entry tracking).
+    4. `/boot` storage health and kernel counting (critical alert if < 100 MB, warning if < 250 MB).
+    5. Database integrity, schema version (v2 migration status), and storage access.
+    6. Package manager lock inspection (`/var/lib/dpkg/lock-frontend`, `/var/lib/apt/lists/lock`, etc.) checking active holding processes vs. defunct/dead PIDs.
+    7. Inventory scan freshness (warns if scan is older than 24 hours or uninitialized).
+    8. ULUM version and online self-update check.
+- **Machine-Readable JSON Diagnostics (`ulum doctor --json`)**:
+  - Emits clean, parseable JSON containing all 8 check details, timestamps, overall status (`healthy`, `degraded`, `failed`), failing checks list, and exit code.
+  - Returns standard exit codes: Exit 0 for healthy or degraded (warnings), Exit 1 for failed checks, Exit 2 for fatal/missing input.
+- **Automated Stale Lock Repair (`ulum doctor --fix`)**:
+  - Safely discovers and removes stale lock files where the holding PID is defunct/dead without disturbing actively running package manager processes.
+  - Triggers `dpkg --configure -a` and `apt-get install -f -y` to repair interrupted package states.
+
+### 🛡️ P0 Safety Hardening for Carried-Forward Modules (v0.4.0 Step 3)
+
+- **AptRepoDoctor Automatic Backups & Restoration (`src/ulum/doctor/repos.py`)**:
+  - Automatically creates a timestamped pre-modification backup file (`<path>.ulum-backup-<timestamp>`) before modifying any APT repo or sources file.
+  - Enforces strict target path allow-listing: edits are restricted to verified sources list files under `/etc/apt/sources.list` or `/etc/apt/sources.list.d/`.
+  - Added `restore_all_backups()` and corresponding CLI flag `ulum doctor --restore-repos` to restore all modified repo configurations from their latest backups in one operation.
+- **KernelCleaner Safety & Boot Integrity Guards (`src/ulum/removal/kernels.py`)**:
+  - Running Kernel Guard: Inspects `uname -r` and strictly refuses deletion of any package matching the running kernel.
+  - 2-Kernel Minimum Rule: Aborts kernel purges if the cleanup plan leaves fewer than 2 installed kernels (active running kernel + newest fallback kernel).
+  - Third-Party Driver Safety: Detects compiled DKMS modules in `/var/lib/dkms` and warns users of potential driver recompilation/breakage before purging headers.
+  - Snapshot Protection: Detects Timeshift and Snapper (`detect_snapshot_tool()`) and prompts/logs pre-cleanup system snapshot recommendations.
+  - Emergency Recovery Guidance: Emits explicit recovery instructions ("Do NOT reboot until fixed: run `sudo apt --fix-broken install`") upon any partial or failed kernel purge.
+- **SelfUpdater Cryptographic Verification & Rollback (`src/ulum/utils/self_update.py`)**:
+  - Mandatory SHA256 checksum verification (`apply_update(expected_sha256=...)`) before applying or installing release binaries/packages.
+  - Rollback Preservation: Preserves previous running executable in `~/.local/share/ulum/rollback/` prior to binary replacement.
+  - Post-Install Launch Verification: Performs a smoke test (`ulum --version`) following installation; rolls back automatically if verification fails.
+- **AppImage Integration Collision Protection & Unintegration (`src/ulum/adapters/appimage.py`)**:
+  - Collision Detection: Backs up existing `.desktop` files (`.desktop.backup`) before overwriting during desktop registration.
+  - Strict Path Validation: Enforces that target files exist and possess the `.AppImage` extension.
+  - Unintegration Support: Implemented `unintegrate_appimage()` and `ulum integrate --remove <id>` to cleanly deregister desktop entries and restore original backups.
+
 ### ⚡ Parallel Async Engine & Security Tagging (v0.4.0 Step 2)
 
 - **Concurrent Async Scanner (`src/ulum/core/orchestrator.py`)**:
