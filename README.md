@@ -154,13 +154,14 @@ ulum gui
 ./run_gui.sh
 ```
 
-- **Home (Bento Dashboard)**: Live 0-100 Health Score with itemized deduction breakdowns, updates count by urgency (Security, Critical, Feature, Unknown) with "Security tagging is APT-only in v0.4" notice, 1-click "Update Security Only", `/boot` partition storage monitor, repository health, and recent operations history.
-- **Live Updates Tab**: View pending updates across all sources, filter by urgency, see total estimated download sizes (with amber warnings if > 1 GB), and update security-only, individually, or in bulk.
+- **Home (Bento Dashboard)**: Modern theme-aware card interface featuring a Hero Health Score with native `Gtk.LevelBar` (0-100 with itemized deduction breakdowns), interactive urgency metric pills (`🛡️ Security`, `⚠️ Critical`, `✨ Feature`, `📦 Other`) providing 1-click filtered navigation to Updates, visual `/boot` partition storage gauge (`Gtk.ProgressBar`) with `< 100 MB` low-space warnings, repository health, and recent operations history.
+- **Live Updates Tab**: View pending updates across all sources with symbolic system icons, filter by urgency via dedicated dropdown or 1-click pills from Home, see total estimated download sizes (with amber warnings if > 1 GB), and update security-only, individually, or in bulk.
 - **Installed Software Tab**: Search, filter by source, inspect dependencies, trigger standard and complete uninstalls, and 1-click **Integrate AppImages** into your desktop menu.
 - **Leftovers & Cleanup Tab**: Browse residual directories with confidence ratings and 1-click **Clean Old Kernels** to free `/boot` space.
 - **Diagnostics Tab (System Doctor)**: Interactive live 8-point checklist view with 1-click **Fix 404 Repos**, **Restore Repo Backups**, and **Repair Stale Locks**.
 - **Operation History Tab**: Track past system operations (updates, removals, repo fixes, kernel cleans, integrations, self-updates), exit codes, and timestamps.
 - **Settings Tab**: View environment details, configure package managers, and use the **ULUM Application Updates** card to check GitHub releases, verify SHA256 checksums, and manage rollback binaries.
+- **Visual Styling & Accessibility**: Zero external UI dependencies; applies lightweight CSS utilizing native system theme variables (`@theme_bg_color`, `@borders`) and FreeDesktop symbolic icons for instant startup and seamless dark/light desktop blending.
 
 > [!NOTE]
 > When launched from the application launcher or via `ulum-gui`, ULUM uses PolicyKit (`pkexec`) to prompt for administrative authorization once. The dashboard runs in **Root Administrator** mode with X11 display access forwarding, enabling seamless in-app package downloads and installations while preserving the user's database inventory.

@@ -9,7 +9,8 @@ from typing import Any, Callable, Dict, List, Optional
 
 import gi
 gi.require_version("Gtk", "3.0")
-from gi.repository import GLib, Gtk
+gi.require_version("Gdk", "3.0")
+from gi.repository import Gdk, GLib, Gtk
 
 from ulum.cli.display import format_bytes
 from ulum.core.config import load_config
@@ -107,9 +108,12 @@ class MainWindow(Gtk.Window):
         self.header.pack_end(self.spinner)
 
         # Quick Scan Button in header
-        self.btn_scan = Gtk.Button(label="Scan System")
+        self.btn_scan = self._make_button("Scan System", "system-search-symbolic")
         self.btn_scan.connect("clicked", lambda b: self.on_scan_clicked())
         self.header.pack_start(self.btn_scan)
+
+        # Apply CSS Provider for modern cards & widgets
+        self._init_styles()
 
         # Main Layout: Notebook with 7 Views (PRD §6.4)
         self.notebook = Gtk.Notebook()
@@ -129,6 +133,103 @@ class MainWindow(Gtk.Window):
         self.reload_home_data()
         self.reload_installed_data()
         self.reload_updates_data()
+
+    def _init_styles(self):
+        """Applies a lightweight, theme-respecting CSS stylesheet for modern dashboard visuals."""
+        css = b"""
+        .dashboard-card {
+            background-color: alpha(@theme_bg_color, 0.7);
+            border: 1px solid alpha(@borders, 0.5);
+            border-radius: 8px;
+            padding: 8px;
+        }
+        .metric-pill {
+            border-radius: 12px;
+            padding: 3px 8px;
+            font-weight: bold;
+        }
+        .pill-danger {
+            background-color: #e01b24;
+            color: #ffffff;
+        }
+        .pill-warning {
+            background-color: #ff7800;
+            color: #ffffff;
+        }
+        .pill-info {
+            background-color: #3584e4;
+            color: #ffffff;
+        }
+        .pill-neutral {
+            background-color: alpha(@theme_fg_color, 0.12);
+        }
+        """
+        try:
+            provider = Gtk.CssProvider()
+            provider.load_from_data(css)
+            screen = Gdk.Screen.get_default()
+            if screen:
+                Gtk.StyleContext.add_provider_for_screen(
+                    screen, provider, Gtk.STYLE_PROVIDER_PRIORITY_APPLICATION
+                )
+        except Exception:
+            pass
+
+    def _make_button(self, label: str, icon_name: Optional[str] = None, suggested: bool = False, destructive: bool = False) -> Gtk.Button:
+        btn = Gtk.Button()
+        box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=6)
+        if icon_name:
+            icon = Gtk.Image.new_from_icon_name(icon_name, Gtk.IconSize.BUTTON)
+            box.pack_start(icon, False, False, 0)
+        lbl = Gtk.Label(label=label)
+        box.pack_start(lbl, False, False, 0)
+        btn.add(box)
+        if suggested:
+            btn.get_style_context().add_class("suggested-action")
+        if destructive:
+            btn.get_style_context().add_class("destructive-action")
+        return btn
+
+    def _make_pill_button(self, label: str, css_class: str, on_clicked: Callable) -> Gtk.Button:
+        btn = Gtk.Button(label=label)
+        btn.get_style_context().add_class("metric-pill")
+        btn.get_style_context().add_class(css_class)
+        btn.connect("clicked", lambda b: on_clicked())
+        return btn
+
+    def _create_card(self, title: str, icon_name: str) -> tuple[Gtk.Frame, Gtk.Box]:
+        frame = Gtk.Frame()
+        frame.get_style_context().add_class("dashboard-card")
+
+        lbl_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=6)
+        icon = Gtk.Image.new_from_icon_name(icon_name, Gtk.IconSize.BUTTON)
+        lbl = Gtk.Label()
+        lbl.set_markup(f"<b>{GLib.markup_escape_text(title)}</b>")
+        lbl_box.pack_start(icon, False, False, 0)
+        lbl_box.pack_start(lbl, False, False, 0)
+        lbl_box.show_all()
+        frame.set_label_widget(lbl_box)
+
+        content_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=8)
+        content_box.set_border_width(8)
+        frame.add(content_box)
+        return frame, content_box
+
+    def _create_tab_label(self, title: str, icon_name: str) -> Gtk.Box:
+        tbox = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=6)
+        icon = Gtk.Image.new_from_icon_name(icon_name, Gtk.IconSize.MENU)
+        lbl = Gtk.Label(label=title)
+        tbox.pack_start(icon, False, False, 0)
+        tbox.pack_start(lbl, False, False, 0)
+        tbox.show_all()
+        return tbox
+
+    def _filter_updates_to(self, urgency_name: str):
+        mapping = {"Security": 1, "Critical": 2, "Feature": 3, "Unknown": 4}
+        if hasattr(self, "upd_urgency_combo"):
+            idx = mapping.get(urgency_name, 0)
+            self.upd_urgency_combo.set_active(idx)
+        self.notebook.set_current_page(1)
 
     def run_in_background(self, task_func: Callable, on_complete: Optional[Callable] = None):
         self.spinner.start()
@@ -165,27 +266,39 @@ class MainWindow(Gtk.Window):
         box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=14)
         box.set_border_width(18)
 
-        # Header Title
+        # Header Title with Icon
+        title_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=8)
+        title_icon = Gtk.Image.new_from_icon_name("computer-symbolic", Gtk.IconSize.LARGE_TOOLBAR)
+        title_box.pack_start(title_icon, False, False, 0)
         title_lbl = Gtk.Label()
         title_lbl.set_markup("<big><b>System Dashboard &amp; Health Status</b></big>")
         title_lbl.set_xalign(0)
-        box.pack_start(title_lbl, False, False, 0)
+        title_box.pack_start(title_lbl, False, False, 0)
+        box.pack_start(title_box, False, False, 0)
 
         # Health Banner Card
-        self.health_card = Gtk.Frame(label="System Health (Transparent Breakdown)")
-        h_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=6)
-        h_box.set_border_width(12)
+        self.health_card, h_box = self._create_card("System Health (Transparent Breakdown)", "security-high-symbolic")
 
+        score_row = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=12)
         self.lbl_health_score = Gtk.Label()
         self.lbl_health_score.set_markup("<b>Health Score: 100/100 (Calculating...)</b>")
         self.lbl_health_score.set_xalign(0)
-        h_box.pack_start(self.lbl_health_score, False, False, 0)
+        score_row.pack_start(self.lbl_health_score, True, True, 0)
+        h_box.pack_start(score_row, False, False, 0)
+
+        # Health LevelBar
+        self.level_health = Gtk.LevelBar()
+        self.level_health.set_min_value(0)
+        self.level_health.set_max_value(100)
+        self.level_health.add_offset_value(Gtk.LEVEL_BAR_OFFSET_LOW, 60.0)
+        self.level_health.add_offset_value(Gtk.LEVEL_BAR_OFFSET_HIGH, 85.0)
+        self.level_health.set_value(100)
+        h_box.pack_start(self.level_health, False, False, 2)
 
         self.lbl_health_deductions = Gtk.Label()
         self.lbl_health_deductions.set_markup("<small>No active deductions. System is operating normally.</small>")
         self.lbl_health_deductions.set_xalign(0)
         h_box.pack_start(self.lbl_health_deductions, False, False, 0)
-        self.health_card.add(h_box)
         box.pack_start(self.health_card, False, False, 0)
 
         # Bento Grid
@@ -195,89 +308,89 @@ class MainWindow(Gtk.Window):
         grid.set_column_homogeneous(True)
 
         # Card 1: Updates by Urgency
-        upd_card = Gtk.Frame(label="Updates by Urgency")
-        u_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=6)
-        u_box.set_border_width(10)
+        upd_card, u_box = self._create_card("Updates by Urgency", "software-update-available-symbolic")
+
+        # Metric Pill buttons for one-click filter navigation
+        pill_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=6)
+        self.btn_pill_sec = self._make_pill_button("🛡️ 0 Security", "pill-danger", lambda: self._filter_updates_to("Security"))
+        self.btn_pill_crit = self._make_pill_button("⚠️ 0 Critical", "pill-warning", lambda: self._filter_updates_to("Critical"))
+        self.btn_pill_feat = self._make_pill_button("✨ 0 Feature", "pill-info", lambda: self._filter_updates_to("Feature"))
+        self.btn_pill_unk = self._make_pill_button("📦 0 Other", "pill-neutral", lambda: self._filter_updates_to("Unknown"))
+        pill_box.pack_start(self.btn_pill_sec, True, True, 0)
+        pill_box.pack_start(self.btn_pill_crit, True, True, 0)
+        pill_box.pack_start(self.btn_pill_feat, True, True, 0)
+        pill_box.pack_start(self.btn_pill_unk, True, True, 0)
+        u_box.pack_start(pill_box, False, False, 0)
+
         self.lbl_urgency_counts = Gtk.Label()
-        self.lbl_urgency_counts.set_markup(
-            "<b>Security:</b> 0  |  <b>Critical:</b> 0  |  <b>Feature:</b> 0  |  <b>Unknown:</b> 0\n"
-            "<small><i>Note: Security urgency tagging is APT-only in v0.4</i></small>"
-        )
+        self.lbl_urgency_counts.set_markup("<small><i>Note: Security urgency tagging is APT-only in v0.4</i></small>")
         self.lbl_urgency_counts.set_xalign(0)
         u_box.pack_start(self.lbl_urgency_counts, True, True, 0)
 
-        btn_sec_upd = Gtk.Button(label="Update Security Only")
-        btn_sec_upd.connect("clicked", lambda b: self.on_update_security_only_clicked())
-        u_box.pack_start(btn_sec_upd, False, False, 0)
-        upd_card.add(u_box)
+        self.btn_sec_upd = self._make_button("Update Security Only", "security-high-symbolic")
+        self.btn_sec_upd.connect("clicked", lambda b: self.on_update_security_only_clicked())
+        u_box.pack_start(self.btn_sec_upd, False, False, 0)
         grid.attach(upd_card, 0, 0, 1, 1)
 
         # Card 2: /boot & Kernel Health
-        boot_card = Gtk.Frame(label="/boot Partition & Kernels")
-        b_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=6)
-        b_box.set_border_width(10)
+        boot_card, b_box = self._create_card("/boot Partition & Kernels", "drive-harddisk-symbolic")
         self.lbl_boot_status = Gtk.Label()
-        self.lbl_boot_status.set_markup("<b>/boot:</b> Inspecting storage...\n<small>Kernels installed: inspecting</small>")
+        self.lbl_boot_status.set_markup("<b>Kernels:</b> Inspecting...\n<small>Inspecting storage</small>")
         self.lbl_boot_status.set_xalign(0)
-        b_box.pack_start(self.lbl_boot_status, True, True, 0)
+        b_box.pack_start(self.lbl_boot_status, False, False, 0)
 
-        btn_clean_kernels = Gtk.Button(label="Clean Old Kernels")
-        btn_clean_kernels.connect("clicked", lambda b: self.on_clean_kernels_clicked())
-        b_box.pack_start(btn_clean_kernels, False, False, 0)
-        boot_card.add(b_box)
+        # Storage Progress Bar
+        self.progress_boot = Gtk.ProgressBar()
+        self.progress_boot.set_show_text(True)
+        self.progress_boot.set_text("Inspecting storage...")
+        b_box.pack_start(self.progress_boot, False, False, 4)
+
+        self.btn_clean_kernels = self._make_button("Clean Old Kernels", "edit-clear-symbolic")
+        self.btn_clean_kernels.connect("clicked", lambda b: self.on_clean_kernels_clicked())
+        b_box.pack_start(self.btn_clean_kernels, False, False, 0)
         grid.attach(boot_card, 1, 0, 1, 1)
 
         # Card 3: Repository Health
-        repo_card = Gtk.Frame(label="Repository Health")
-        r_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=6)
-        r_box.set_border_width(10)
+        repo_card, r_box = self._create_card("Repository Health", "network-server-symbolic")
         self.lbl_repo_status = Gtk.Label()
         self.lbl_repo_status.set_markup("<b>Sources:</b> Active repos healthy\n<small>AptRepoDoctor monitoring active</small>")
         self.lbl_repo_status.set_xalign(0)
         r_box.pack_start(self.lbl_repo_status, True, True, 0)
 
         r_btn_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=6)
-        btn_fix_repos = Gtk.Button(label="Fix 404 Repos")
+        btn_fix_repos = self._make_button("Fix 404 Repos", "tools-check-symbolic")
         btn_fix_repos.connect("clicked", lambda b: self.on_fix_repos_clicked())
         r_btn_box.pack_start(btn_fix_repos, True, True, 0)
-        btn_restore_repos = Gtk.Button(label="Restore Backups")
+        btn_restore_repos = self._make_button("Restore Backups", "edit-undo-symbolic")
         btn_restore_repos.connect("clicked", lambda b: self.on_restore_repos_clicked())
         r_btn_box.pack_start(btn_restore_repos, True, True, 0)
         r_box.pack_start(r_btn_box, False, False, 0)
-
-        repo_card.add(r_box)
         grid.attach(repo_card, 0, 1, 1, 1)
 
         # Card 4: Residual Cleanups
-        left_card = Gtk.Frame(label="Residual Storage & Leftovers")
-        l_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=6)
-        l_box.set_border_width(10)
+        left_card, l_box = self._create_card("Residual Storage & Leftovers", "user-trash-symbolic")
         self.lbl_leftover_status = Gtk.Label()
         self.lbl_leftover_status.set_markup("<b>Verified Leftovers:</b> 0 bytes\n<small>Ready for clean removal</small>")
         self.lbl_leftover_status.set_xalign(0)
         l_box.pack_start(self.lbl_leftover_status, True, True, 0)
 
-        btn_review_leftovers = Gtk.Button(label="Review Leftovers Tab")
+        btn_review_leftovers = self._make_button("Review Leftovers Tab", "go-next-symbolic")
         btn_review_leftovers.connect("clicked", lambda b: self.notebook.set_current_page(3))
         l_box.pack_start(btn_review_leftovers, False, False, 0)
-        left_card.add(l_box)
         grid.attach(left_card, 1, 1, 1, 1)
 
         box.pack_start(grid, False, False, 0)
 
         # Recent Operations Frame
-        recent_card = Gtk.Frame(label="Recent System Operations")
-        recent_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=6)
-        recent_box.set_border_width(10)
+        recent_card, recent_box = self._create_card("Recent System Operations", "document-open-recent-symbolic")
         self.lbl_recent_ops = Gtk.Label()
         self.lbl_recent_ops.set_markup("<small>No recent operations recorded in local history.</small>")
         self.lbl_recent_ops.set_xalign(0)
         recent_box.pack_start(self.lbl_recent_ops, False, False, 0)
-        recent_card.add(recent_box)
         box.pack_start(recent_card, False, False, 0)
 
         scroller.add(box)
-        self.notebook.append_page(scroller, Gtk.Label(label="Home"))
+        self.notebook.append_page(scroller, self._create_tab_label("Home", "go-home-symbolic"))
 
     def reload_home_data(self):
         """Refreshes all cards on the Home Bento dashboard."""
@@ -286,10 +399,14 @@ class MainWindow(Gtk.Window):
 
         score = health_data["score"]
         status = health_data["status"]
-        color = "green" if score >= 85 else ("orange" if score >= 60 else "red")
+        color = "#2ec27e" if score >= 85 else ("#ff7800" if score >= 60 else "#e01b24")
         self.lbl_health_score.set_markup(
-            f"<big><b>Health Score: <span color='{color}'>{score}/100 ({status})</span></b></big>"
+            f"<span size='24000' weight='heavy' color='{color}'>{score}</span>"
+            f"<span size='large' weight='bold'>/100</span>  "
+            f"<span background='{color}' color='white' weight='bold'>  {status}  </span>"
         )
+        if hasattr(self, "level_health"):
+            self.level_health.set_value(score)
 
         if health_data["deductions"]:
             ded_lines = [
@@ -300,29 +417,62 @@ class MainWindow(Gtk.Window):
         else:
             self.lbl_health_deductions.set_markup("<small>No deductions active. System is operating at peak health.</small>")
 
-        # Urgency counts
+        # Urgency counts & metric pills
         updates = self.repo.get_updates()
         sec = sum(1 for u in updates if u.get("urgency") == "Security")
         crit = sum(1 for u in updates if u.get("urgency") == "Critical")
         feat = sum(1 for u in updates if u.get("urgency") == "Feature")
         unk = sum(1 for u in updates if u.get("urgency") == "Unknown")
+
+        if hasattr(self, "btn_pill_sec"):
+            self.btn_pill_sec.set_label(f"🛡️ {sec} Security")
+            self.btn_pill_crit.set_label(f"⚠️ {crit} Critical")
+            self.btn_pill_feat.set_label(f"✨ {feat} Feature")
+            self.btn_pill_unk.set_label(f"📦 {unk} Other")
+
         self.lbl_urgency_counts.set_markup(
-            f"<b>Security:</b> <span color='red'>{sec}</span>  |  "
-            f"<b>Critical:</b> <span color='orange'>{crit}</span>  |  "
-            f"<b>Feature:</b> {feat}  |  "
-            f"<b>Unknown:</b> {unk}\n"
-            f"<small><i>Note: Security urgency tagging is APT-only in v0.4</i></small>"
+            f"<b>Urgency Distribution:</b> {sec} Security, {crit} Critical, {feat} Feature, {unk} Other\n"
+            f"<small><i>Note: Security urgency tagging is APT-only in v0.4 (Click a badge above to filter)</i></small>"
         )
 
-        # /boot status
+        if hasattr(self, "btn_sec_upd"):
+            ctx = self.btn_sec_upd.get_style_context()
+            if sec > 0:
+                if not ctx.has_class("suggested-action"):
+                    ctx.add_class("suggested-action")
+            else:
+                if ctx.has_class("suggested-action"):
+                    ctx.remove_class("suggested-action")
+
+        # /boot status & progress bar
         boot_res = SystemDoctor.check_boot_health()
-        free_mb = boot_res.details.get("free_mb", 0)
+        free_mb = boot_res.details.get("free_mb", 0.0)
+        total_mb = boot_res.details.get("total_mb", 0.0)
         k_count = boot_res.details.get("installed_kernels_count", 0)
         b_kernel = GLib.markup_escape_text(str(boot_res.details.get("booted_kernel", "unknown")))
         self.lbl_boot_status.set_markup(
-            f"<b>/boot Storage:</b> {free_mb:.0f} MB free\n"
-            f"<small>Kernels installed: {k_count} (Booted: {b_kernel})</small>"
+            f"<b>Kernels:</b> {k_count} installed (Booted: {b_kernel})"
         )
+
+        if hasattr(self, "progress_boot"):
+            if total_mb > 0:
+                used_mb = max(0.0, total_mb - free_mb)
+                fraction = min(1.0, max(0.0, used_mb / total_mb))
+                pct = fraction * 100
+                self.progress_boot.set_fraction(fraction)
+                self.progress_boot.set_text(f"{used_mb:.0f} MB / {total_mb:.0f} MB ({pct:.0f}% used) — {free_mb:.0f} MB free")
+            else:
+                self.progress_boot.set_fraction(0.0)
+                self.progress_boot.set_text(f"{free_mb:.0f} MB free")
+
+        if hasattr(self, "btn_clean_kernels"):
+            ctx = self.btn_clean_kernels.get_style_context()
+            if free_mb > 0 and free_mb < 100:
+                if not ctx.has_class("destructive-action"):
+                    ctx.add_class("destructive-action")
+            else:
+                if ctx.has_class("destructive-action"):
+                    ctx.remove_class("destructive-action")
 
         # Repo status
         repo_res = SystemDoctor.check_repositories()
@@ -331,6 +481,14 @@ class MainWindow(Gtk.Window):
         self.lbl_repo_status.set_markup(
             f"<b>Active Sources:</b> {act_cnt}\n"
             f"<small>Disabled by ULUM: {dis_cnt}</small>"
+        )
+
+        # Leftovers status
+        leftovers = self.repo.get_cleanup_candidates()
+        left_bytes = sum(c.get("estimated_size_bytes", 0) for c in leftovers)
+        self.lbl_leftover_status.set_markup(
+            f"<b>Verified Leftovers:</b> {format_bytes(left_bytes)} ({len(leftovers)} candidates)\n"
+            f"<small>Ready for safe removal</small>"
         )
 
         # Recent operations
@@ -356,27 +514,39 @@ class MainWindow(Gtk.Window):
 
         # Toolbar
         tbar = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=8)
-        self.btn_check_upd = Gtk.Button(label="Check for Updates")
+        self.btn_check_upd = self._make_button("Check for Updates", "view-refresh-symbolic")
         self.btn_check_upd.connect("clicked", lambda b: self.on_check_updates_clicked())
         tbar.pack_start(self.btn_check_upd, False, False, 0)
 
-        self.btn_sec_only = Gtk.Button(label="Update Security Only")
+        self.btn_sec_only = self._make_button("Update Security Only", "security-high-symbolic")
         self.btn_sec_only.connect("clicked", lambda b: self.on_update_security_only_clicked())
         tbar.pack_start(self.btn_sec_only, False, False, 0)
 
-        self.btn_update_selected = Gtk.Button(label="Update Selected")
+        self.btn_update_selected = self._make_button("Update Selected", "emblem-default-symbolic")
         self.btn_update_selected.connect("clicked", lambda b: self.on_update_selected_clicked())
         tbar.pack_start(self.btn_update_selected, False, False, 0)
 
-        self.btn_update_all = Gtk.Button(label="Update All")
+        self.btn_update_all = self._make_button("Update All", "software-update-available-symbolic", suggested=True)
         self.btn_update_all.connect("clicked", lambda b: self.on_update_all_clicked())
         tbar.pack_start(self.btn_update_all, False, False, 0)
+
+        # Urgency filter dropdown in updates toolbar
+        lbl_filt = Gtk.Label(label="Filter:")
+        tbar.pack_start(lbl_filt, False, False, 4)
+        self.upd_urgency_combo = Gtk.ComboBoxText()
+        for u in ["All Urgencies", "Security", "Critical", "Feature", "Unknown"]:
+            self.upd_urgency_combo.append_text(u)
+        self.upd_urgency_combo.set_active(0)
+        self.upd_urgency_combo.connect("changed", lambda c: self.upd_filter.refilter())
+        tbar.pack_start(self.upd_urgency_combo, False, False, 0)
 
         box.pack_start(tbar, False, False, 0)
 
         # TreeView: Source, Qualified ID, Urgency, Current Ver, Available Ver
         self.upd_store = Gtk.ListStore(str, str, str, str, str)
-        self.upd_view = Gtk.TreeView(model=self.upd_store)
+        self.upd_filter = self.upd_store.filter_new()
+        self.upd_filter.set_visible_func(self._upd_filter_func)
+        self.upd_view = Gtk.TreeView(model=self.upd_filter)
 
         for idx, title in enumerate(["Source", "Application ID", "Urgency", "Current Version", "New Version"]):
             col = Gtk.TreeViewColumn(title, Gtk.CellRendererText(), text=idx)
@@ -387,7 +557,15 @@ class MainWindow(Gtk.Window):
         scroller.add(self.upd_view)
         box.pack_start(scroller, True, True, 0)
 
-        self.notebook.append_page(box, Gtk.Label(label="Updates"))
+        self.notebook.append_page(box, self._create_tab_label("Updates", "software-update-available-symbolic"))
+
+    def _upd_filter_func(self, model, tree_iter, data):
+        if not hasattr(self, "upd_urgency_combo"):
+            return True
+        sel = self.upd_urgency_combo.get_active_text()
+        if not sel or sel == "All Urgencies":
+            return True
+        return model[tree_iter][2] == sel
 
     def reload_updates_data(self):
         self.upd_store.clear()
@@ -400,6 +578,8 @@ class MainWindow(Gtk.Window):
                 u["current_version"],
                 u["available_version"],
             ])
+        if hasattr(self, "upd_filter"):
+            self.upd_filter.refilter()
         self.reload_home_data()
 
     def on_check_updates_clicked(self):
@@ -535,7 +715,7 @@ class MainWindow(Gtk.Window):
         act_box.pack_start(self.btn_integrate, False, False, 0)
 
         box.pack_start(act_box, False, False, 0)
-        self.notebook.append_page(box, Gtk.Label(label="Installed Software"))
+        self.notebook.append_page(box, self._create_tab_label("Installed Software", "system-software-install-symbolic"))
 
     def _filter_func(self, model, tree_iter, data):
         query = self.search_entry.get_text().lower().strip()
@@ -696,7 +876,7 @@ class MainWindow(Gtk.Window):
         scroller.add(self.leftover_view)
         box.pack_start(scroller, True, True, 0)
 
-        self.notebook.append_page(box, Gtk.Label(label="Leftovers & Cleanup"))
+        self.notebook.append_page(box, self._create_tab_label("Leftovers & Cleanup", "user-trash-symbolic"))
 
     def on_scan_leftovers_clicked(self):
         scanner = LeftoverScanner(self.repo, adapters=self.orchestrator.adapters)
@@ -832,7 +1012,7 @@ class MainWindow(Gtk.Window):
         scroller.add(self.doc_view)
         box.pack_start(scroller, True, True, 0)
 
-        self.notebook.append_page(box, Gtk.Label(label="Diagnostics"))
+        self.notebook.append_page(box, self._create_tab_label("Diagnostics", "dialog-information-symbolic"))
 
     def reload_doctor_data(self):
         def task():
@@ -931,7 +1111,7 @@ class MainWindow(Gtk.Window):
         scroller.add(self.hist_view)
         box.pack_start(scroller, True, True, 0)
 
-        self.notebook.append_page(box, Gtk.Label(label="History"))
+        self.notebook.append_page(box, self._create_tab_label("History", "document-open-recent-symbolic"))
         self.reload_history_data()
 
     def reload_history_data(self):
@@ -1019,7 +1199,7 @@ class MainWindow(Gtk.Window):
         box.pack_start(cfg_card, False, False, 0)
 
         scroller.add(box)
-        self.notebook.append_page(scroller, Gtk.Label(label="Settings"))
+        self.notebook.append_page(scroller, self._create_tab_label("Settings", "emblem-system-symbolic"))
 
     def on_check_self_clicked(self):
         def task():

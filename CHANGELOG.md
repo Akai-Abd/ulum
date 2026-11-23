@@ -14,6 +14,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Native GTK Desktop Application (`src/ulum/gui/window.py`)**:
   - Replaced the embedded WebKit2 browser and local HTTP server architecture with an instant, native GTK desktop interface, removing browser engine startup overhead and eliminating X11/DMABUF driver instability.
   - Implemented 7 structured views matching PRD §6.4: Home (Bento Dashboard), Updates, Installed Software, Leftovers & Cleanup, Diagnostics (Doctor), History, and Settings & About.
+  - Added lightweight GTK CSS provider injecting `.dashboard-card` visuals using system theme colors (`@theme_bg_color`, `@theme_fg_color`, `@borders`) ensuring seamless dark and light mode blending across Linux Mint, GNOME, XFCE, and KDE.
+  - Integrated FreeDesktop symbolic icons across card headers, action buttons, and notebook view tab labels without extra asset files.
 - **Bento Home Dashboard & Transparent Health Score Engine (`calculate_health_score`)**:
   - Quantitative 0-100 Health Score starting at 100 with itemized, visible deductions per PRD §6.3:
     - Pending Security updates (-5 pts each, max -30)
@@ -23,7 +25,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
     - Stale package manager locks (-10 pts)
     - Unscanned inventory older than 24h (-10 pts)
     - Verified cleanup leftovers exceeding 1 GB (-5 pts)
-  - Updates by Urgency card with prominent disclosure: "Security urgency tagging is APT-only in v0.4".
+  - Hero Health Score widget displaying large typography, prominent status badge (`Optimal`, `Attention Needed`, `Critical`), and a native `Gtk.LevelBar` with green (>85), yellow (60-84), and red (<60) offsets.
+  - Interactive urgency metric pills (`🛡️ Security`, `⚠️ Critical`, `✨ Feature`, `📦 Other`) providing 1-click jump and automated filtering in the Updates view.
+  - Dedicated urgency filter dropdown in the Updates view (`Gtk.TreeModelFilter`).
+  - Visual `/boot` partition storage gauge (`Gtk.ProgressBar`) showing consumed vs. total capacity and highlighting kernel cleanup with `.destructive-action` when free space < 100 MB.
   - 1-click quick action buttons: "Update Security Only", "Clean Old Kernels", "Fix 404 Repos", and "Review Leftovers".
 - **Integrated Diagnostics & Settings**:
   - Live 8-point checklist view in the Diagnostics tab with 1-click PPA repair, repo backup restoration, and stale lock clearing.

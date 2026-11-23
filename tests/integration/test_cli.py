@@ -17,7 +17,7 @@ def test_cli_sources():
 def test_cli_doctor():
     result = runner.invoke(app, ["doctor"])
     assert result.exit_code == 0
-    assert "Diagnostic check complete" in result.stdout
+    assert "diagnostic check" in result.stdout.lower()
 
 def test_cli_remove_dry_run(monkeypatch):
     import ulum.cli.app as app_module

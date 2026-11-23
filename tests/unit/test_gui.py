@@ -14,6 +14,15 @@ def test_gui_window_initialization():
         win = MainWindow()
         assert win.header.props.title == "ULUM Update Manager"
         assert win.notebook.get_n_pages() == 7
+        assert hasattr(win, "level_health")
+        assert hasattr(win, "progress_boot")
+        assert hasattr(win, "btn_pill_sec")
+        assert hasattr(win, "upd_urgency_combo")
+
+        # Test metric pill filter action
+        win._filter_updates_to("Security")
+        assert win.upd_urgency_combo.get_active_text() == "Security"
+
         win.destroy()
     except Exception as e:
         pytest.skip(f"GUI display not available: {e}")

@@ -380,6 +380,13 @@ Notifications must be opt-in or configurable and must not execute updates or rem
 ### 7.17 Native desktop GUI & transparent health score (v0.4.0)
 
 - Replaces embedded WebKit2 browser with an instant, native GTK desktop application with 7 dedicated views: Home (Bento Dashboard), Updates, Installed, Leftovers, Diagnostics, History, and Settings.
+- Modern GTK3 Visual Architecture with zero external UI dependencies:
+  - System Theme-aware CSS provider injecting `.dashboard-card` container styling with soft alpha backgrounds (`alpha(@theme_bg_color, 0.7)`) and subtle borders matching host desktop environments (GNOME, Mint-Y, Breeze, XFCE).
+  - Hero Health Score with native `Gtk.LevelBar` displaying quantitative color thresholds (Green > 85, Yellow 60-84, Red < 60) and prominent status badges.
+  - Interactive urgency metric pills (`🛡️ Security`, `⚠️ Critical`, `✨ Feature`, `📦 Other`) providing 1-click filtered navigation to the Updates tab.
+  - Dedicated urgency filter dropdown in the Updates view (`Gtk.TreeModelFilter`).
+  - Visual `/boot` partition storage progress gauge (`Gtk.ProgressBar`) showing consumed vs. total megabytes with automatic `.destructive-action` highlighting on kernel cleanup if free space < 100 MB.
+  - Standard FreeDesktop symbolic icons applied to view tabs, card titles, and header action buttons.
 - Transparent 0-100 Health Score starting at 100 with itemized, visible deductions per PRD §6.3:
   - Pending Security updates (-5 pts each, max -30)
   - Pending Critical updates (-4 pts each, max -20)
