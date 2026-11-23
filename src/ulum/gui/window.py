@@ -1,5 +1,6 @@
 """Native GTK3 / Libadwaita-compatible desktop GUI window for ULUM v0.4."""
 import os
+import platform
 import shutil
 import threading
 from datetime import datetime
@@ -166,7 +167,7 @@ class MainWindow(Gtk.Window):
 
         # Header Title
         title_lbl = Gtk.Label()
-        title_lbl.set_markup("<big><b>System Dashboard & Health Status</b></big>")
+        title_lbl.set_markup("<big><b>System Dashboard &amp; Health Status</b></big>")
         title_lbl.set_xalign(0)
         box.pack_start(title_lbl, False, False, 0)
 
@@ -291,7 +292,10 @@ class MainWindow(Gtk.Window):
         )
 
         if health_data["deductions"]:
-            ded_lines = [f"• {d['factor']} (<span color='red'>{d['points']} pts</span>)" for d in health_data["deductions"]]
+            ded_lines = [
+                f"• {GLib.markup_escape_text(d['factor'])} (<span color='red'>{d['points']} pts</span>)"
+                for d in health_data["deductions"]
+            ]
             self.lbl_health_deductions.set_markup("\n".join(ded_lines))
         else:
             self.lbl_health_deductions.set_markup("<small>No deductions active. System is operating at peak health.</small>")
@@ -314,7 +318,7 @@ class MainWindow(Gtk.Window):
         boot_res = SystemDoctor.check_boot_health()
         free_mb = boot_res.details.get("free_mb", 0)
         k_count = boot_res.details.get("installed_kernels_count", 0)
-        b_kernel = boot_res.details.get("booted_kernel", "unknown")
+        b_kernel = GLib.markup_escape_text(str(boot_res.details.get("booted_kernel", "unknown")))
         self.lbl_boot_status.set_markup(
             f"<b>/boot Storage:</b> {free_mb:.0f} MB free\n"
             f"<small>Kernels installed: {k_count} (Booted: {b_kernel})</small>"
@@ -335,8 +339,10 @@ class MainWindow(Gtk.Window):
             op_lines = []
             for op in ops:
                 ts = str(op.get("started_at", ""))[:19]
-                st = op.get("status", "unknown")
-                op_lines.append(f"• <b>{op.get('operation_type', 'op').upper()}</b>: {op.get('target', 'all')} — {st} ({ts})")
+                st = GLib.markup_escape_text(str(op.get("status", "unknown")))
+                target_str = GLib.markup_escape_text(str(op.get("target") or "all"))
+                op_type = GLib.markup_escape_text(str(op.get("operation_type", "op")).upper())
+                op_lines.append(f"• <b>{op_type}</b>: {target_str} — {st} ({ts})")
             self.lbl_recent_ops.set_markup("\n".join(op_lines))
         else:
             self.lbl_recent_ops.set_markup("<small>No recent operations recorded in local history.</small>")
