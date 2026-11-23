@@ -25,6 +25,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Automatically highlights the "Clean Old Kernels" button with `.destructive-action` when `/boot` free space drops below the 100 MB critical threshold.
 - **Dedicated Urgency Filtering in Updates View**:
   - Added an urgency dropdown filter (`Gtk.ComboBoxText`) connected to `Gtk.TreeModelFilter` in the Updates toolbar.
+- **In-App Manual Upgrade Button**:
+  - Added dedicated "Upgrade Application" / "Upgrade to vX.X.X" button in the Settings view (`self.btn_upgrade_self`).
+  - Automatically enables and highlights with `suggested-action` styling when a newer release is discovered on GitHub.
+  - Automatically prompts for immediate upgrade confirmation when checking releases, executing background package download, SHA256 checksum verification, and reinstall via `SelfUpdater.apply_update`.
 - **FreeDesktop Symbolic System Icons**:
   - Added standard symbolic desktop icons across all 7 notebook view tabs (`go-home-symbolic`, `software-update-available-symbolic`, `system-software-install-symbolic`, `user-trash-symbolic`, `dialog-information-symbolic`, `document-open-recent-symbolic`, `emblem-system-symbolic`), card titles, and header buttons.
 

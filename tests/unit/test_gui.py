@@ -18,6 +18,10 @@ def test_gui_window_initialization():
         assert hasattr(win, "progress_boot")
         assert hasattr(win, "btn_pill_sec")
         assert hasattr(win, "upd_urgency_combo")
+        assert hasattr(win, "btn_upgrade_self")
+        assert hasattr(win, "btn_check_self")
+        assert hasattr(win, "lbl_upgrade_btn")
+        assert win.btn_upgrade_self.get_sensitive() is False
 
         # Test metric pill filter action
         win._filter_updates_to("Security")

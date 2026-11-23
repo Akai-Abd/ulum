@@ -386,6 +386,7 @@ Notifications must be opt-in or configurable and must not execute updates or rem
   - Interactive urgency metric pills (`🛡️ Security`, `⚠️ Critical`, `✨ Feature`, `📦 Other`) providing 1-click filtered navigation to the Updates tab.
   - Dedicated urgency filter dropdown in the Updates view (`Gtk.TreeModelFilter`).
   - Visual `/boot` partition storage progress gauge (`Gtk.ProgressBar`) showing consumed vs. total megabytes with automatic `.destructive-action` highlighting on kernel cleanup if free space < 100 MB.
+  - Dedicated manual in-app upgrade button ("Upgrade Application" / "Upgrade to vX.X.X") in Settings view with automatic confirmation prompt and cryptographic SHA256 integrity verification.
   - Standard FreeDesktop symbolic icons applied to view tabs, card titles, and header action buttons.
 - Transparent 0-100 Health Score starting at 100 with itemized, visible deductions per PRD §6.3:
   - Pending Security updates (-5 pts each, max -30)

@@ -160,7 +160,7 @@ ulum gui
 - **Leftovers & Cleanup Tab**: Browse residual directories with confidence ratings and 1-click **Clean Old Kernels** to free `/boot` space.
 - **Diagnostics Tab (System Doctor)**: Interactive live 8-point checklist view with 1-click **Fix 404 Repos**, **Restore Repo Backups**, and **Repair Stale Locks**.
 - **Operation History Tab**: Track past system operations (updates, removals, repo fixes, kernel cleans, integrations, self-updates), exit codes, and timestamps.
-- **Settings Tab**: View environment details, configure package managers, and use the **ULUM Application Updates** card to check GitHub releases, verify SHA256 checksums, and manage rollback binaries.
+- **Settings Tab**: View environment details, configure package managers, and use the **ULUM Application Updates** card to check GitHub releases, 1-click **Upgrade Application** directly in-app with cryptographic SHA256 verification, and manage rollback binaries.
 - **Visual Styling & Accessibility**: Zero external UI dependencies; applies lightweight CSS utilizing native system theme variables (`@theme_bg_color`, `@borders`) and FreeDesktop symbolic icons for instant startup and seamless dark/light desktop blending.
 
 > [!NOTE]

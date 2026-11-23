@@ -1167,11 +1167,23 @@ class MainWindow(Gtk.Window):
         s_box.pack_start(self.lbl_self_status, False, False, 0)
 
         s_btn_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=8)
-        self.btn_check_self = Gtk.Button(label="Check GitHub Releases")
+        self.btn_check_self = self._make_button("Check GitHub Releases", "view-refresh-symbolic")
         self.btn_check_self.connect("clicked", lambda b: self.on_check_self_clicked())
         s_btn_box.pack_start(self.btn_check_self, False, False, 0)
 
-        self.btn_rollback = Gtk.Button(label="Restore Previous Rollback")
+        self.btn_upgrade_self = Gtk.Button()
+        upg_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=6)
+        upg_icon = Gtk.Image.new_from_icon_name("software-update-available-symbolic", Gtk.IconSize.BUTTON)
+        self.lbl_upgrade_btn = Gtk.Label(label="Upgrade Application")
+        upg_box.pack_start(upg_icon, False, False, 0)
+        upg_box.pack_start(self.lbl_upgrade_btn, False, False, 0)
+        self.btn_upgrade_self.add(upg_box)
+        self.btn_upgrade_self.get_style_context().add_class("suggested-action")
+        self.btn_upgrade_self.set_sensitive(False)
+        self.btn_upgrade_self.connect("clicked", lambda b: self.on_upgrade_self_clicked())
+        s_btn_box.pack_start(self.btn_upgrade_self, False, False, 0)
+
+        self.btn_rollback = self._make_button("Restore Previous Rollback", "edit-undo-symbolic")
         self.btn_rollback.connect("clicked", lambda b: self.on_rollback_clicked())
         s_btn_box.pack_start(self.btn_rollback, False, False, 0)
 
@@ -1211,13 +1223,80 @@ class MainWindow(Gtk.Window):
                 show_error_dialog(self, "Update Check Failed", str(error))
             else:
                 if rel.get("update_available"):
+                    self.latest_release_info = rel
+                    self.lbl_upgrade_btn.set_text(f"Upgrade to v{rel['latest_version']}")
+                    self.btn_upgrade_self.set_sensitive(True)
                     self.lbl_self_status.set_markup(
                         f"<b>Current Version:</b> v{__version__}  |  <b>New Version:</b> <span color='green'>v{rel['latest_version']}</span>\n"
                         f"<small>Release notes: {rel.get('release_notes', 'N/A')}</small>"
                     )
-                    show_info_dialog(self, "Update Available", f"A newer release v{rel['latest_version']} is available on GitHub!")
+                    dlg = Gtk.MessageDialog(
+                        transient_for=self,
+                        flags=0,
+                        message_type=Gtk.MessageType.QUESTION,
+                        buttons=Gtk.ButtonsType.OK_CANCEL,
+                        text="Update Available!",
+                    )
+                    dlg.format_secondary_text(
+                        f"A newer release v{rel['latest_version']} is available on GitHub.\n\n"
+                        f"Do you want to upgrade now?"
+                    )
+                    res = dlg.run()
+                    dlg.destroy()
+                    if res == Gtk.ResponseType.OK:
+                        self.on_upgrade_self_clicked()
                 else:
-                    show_info_dialog(self, "Up to Date", "ULUM is currently running the latest version (v0.4.0).")
+                    self.btn_upgrade_self.set_sensitive(False)
+                    self.lbl_upgrade_btn.set_text("Up to Date")
+                    show_info_dialog(self, "Up to Date", f"ULUM is currently running the latest version (v{__version__}).")
+
+        self.run_in_background(task, done)
+
+    def on_upgrade_self_clicked(self):
+        rel = getattr(self, "latest_release_info", None)
+        if not rel or not rel.get("download_url"):
+            show_error_dialog(self, "No Package Available", "Please click 'Check GitHub Releases' first to discover the download package.")
+            return
+
+        ver = rel.get("latest_version", "latest")
+        sha = rel.get("sha256", "N/A")
+        msg = f"Download and install ULUM v{ver}?\n\nCryptographic SHA256: {sha}\n\nThis will safely reinstall the latest package."
+
+        dlg = Gtk.MessageDialog(
+            transient_for=self,
+            flags=0,
+            message_type=Gtk.MessageType.QUESTION,
+            buttons=Gtk.ButtonsType.OK_CANCEL,
+            text=f"Confirm Upgrade to v{ver}",
+        )
+        dlg.format_secondary_text(msg)
+        res = dlg.run()
+        dlg.destroy()
+        if res != Gtk.ResponseType.OK:
+            return
+
+        def task():
+            return SelfUpdater.apply_update(
+                download_url=rel["download_url"],
+                expected_sha256=rel.get("sha256"),
+                require_sha256=bool(rel.get("sha256")),
+            )
+
+        def done(exec_res, error):
+            if error or (exec_res and not exec_res.success):
+                err = error or (exec_res.error_summary if exec_res else "Self-update failed")
+                show_error_dialog(self, "Upgrade Failed", str(err))
+            else:
+                self.lbl_self_status.set_markup(
+                    f"<b>Current Version:</b> v{ver} <span color='green'>(Upgraded)</span>\n"
+                    f"<small>Please restart ULUM to run the upgraded executable.</small>"
+                )
+                self.btn_upgrade_self.set_sensitive(False)
+                show_info_dialog(
+                    self,
+                    "Upgrade Complete",
+                    f"Successfully upgraded ULUM to v{ver}!\n\nPlease restart the application to use the new version.",
+                )
 
         self.run_in_background(task, done)
 
