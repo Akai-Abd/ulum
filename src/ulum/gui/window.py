@@ -12,6 +12,7 @@ gi.require_version("Gtk", "3.0")
 gi.require_version("Gdk", "3.0")
 from gi.repository import Gdk, GLib, Gtk
 
+from ulum import __version__
 from ulum.cli.display import format_bytes
 from ulum.core.config import load_config
 from ulum.core.orchestrator import Orchestrator
@@ -1161,7 +1162,7 @@ class MainWindow(Gtk.Window):
         s_box.set_border_width(12)
 
         self.lbl_self_status = Gtk.Label()
-        self.lbl_self_status.set_markup("<b>Current Version:</b> v0.4.0\n<small>Cryptographic SHA256 verification enabled</small>")
+        self.lbl_self_status.set_markup(f"<b>Current Version:</b> v{__version__}\n<small>Cryptographic SHA256 verification enabled</small>")
         self.lbl_self_status.set_xalign(0)
         s_box.pack_start(self.lbl_self_status, False, False, 0)
 
@@ -1203,7 +1204,7 @@ class MainWindow(Gtk.Window):
 
     def on_check_self_clicked(self):
         def task():
-            return SelfUpdater.check_latest_release(current_version="0.4.0", timeout=5)
+            return SelfUpdater.check_latest_release(current_version=__version__, timeout=5)
 
         def done(rel, error):
             if error:
@@ -1211,7 +1212,7 @@ class MainWindow(Gtk.Window):
             else:
                 if rel.get("update_available"):
                     self.lbl_self_status.set_markup(
-                        f"<b>Current Version:</b> v0.4.0  |  <b>New Version:</b> <span color='green'>v{rel['latest_version']}</span>\n"
+                        f"<b>Current Version:</b> v{__version__}  |  <b>New Version:</b> <span color='green'>v{rel['latest_version']}</span>\n"
                         f"<small>Release notes: {rel.get('release_notes', 'N/A')}</small>"
                     )
                     show_info_dialog(self, "Update Available", f"A newer release v{rel['latest_version']} is available on GitHub!")

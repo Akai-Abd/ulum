@@ -7,6 +7,37 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [0.4.1] - 2026-11-23
+
+### 🎨 GTK3 Dashboard Visual Overhaul & Interactive Navigation
+
+- **Lightweight CSS Provider & Modern Card Styling (`_init_styles`)**:
+  - Injected theme-respecting CSS provider with `.dashboard-card` container styles using GTK theme palette variables (`@theme_bg_color`, `@borders`), providing rounded corners (`border-radius: 8px`), subtle contrast backgrounds, and clean padding without third-party themes.
+  - Seamlessly adapts to host dark and light themes across GNOME, Linux Mint (Cinnamon), XFCE, and KDE Plasma.
+- **Hero Health Score Widget & Native `Gtk.LevelBar`**:
+  - Replaced plain text health score label with prominent hero typography (`<span size='24000'>`) and quantitative status chip badges (`Optimal`, `Attention Needed`, `Critical`).
+  - Added native `Gtk.LevelBar` displaying dynamic level offsets (Green > 85, Yellow 60–84, Red < 60) for instant health evaluation at a glance.
+- **Interactive Urgency Metric Pills**:
+  - Replaced static text summary with clickable pill badges (`🛡️ Security`, `⚠️ Critical`, `✨ Feature`, `📦 Other`) on the Home dashboard.
+  - Clicking any urgency pill immediately jumps to the **Updates** tab (`_filter_updates_to`) and automatically activates that urgency filter in the list.
+- **Visual `/boot` Storage Gauge (`Gtk.ProgressBar`)**:
+  - Added visual progress bar showing exact megabytes used vs. total capacity (`MB / MB used (%) — MB free`).
+  - Automatically highlights the "Clean Old Kernels" button with `.destructive-action` when `/boot` free space drops below the 100 MB critical threshold.
+- **Dedicated Urgency Filtering in Updates View**:
+  - Added an urgency dropdown filter (`Gtk.ComboBoxText`) connected to `Gtk.TreeModelFilter` in the Updates toolbar.
+- **FreeDesktop Symbolic System Icons**:
+  - Added standard symbolic desktop icons across all 7 notebook view tabs (`go-home-symbolic`, `software-update-available-symbolic`, `system-software-install-symbolic`, `user-trash-symbolic`, `dialog-information-symbolic`, `document-open-recent-symbolic`, `emblem-system-symbolic`), card titles, and header buttons.
+
+### 🐞 Fixes & Reliability
+
+- **Dynamic Versioning & SelfUpdater Sync**:
+  - Replaced hardcoded version strings in `SystemDoctor.check_version_and_updates` and GUI Settings with dynamic package version `__version__`.
+  - Fixed candidate query to call `Repository.get_cleanup_candidates()` on the Home dashboard.
+  - Fixed `test_cli_doctor` test assertion to match case-normalized diagnostic outputs.
+  - Maintained 100% test suite pass rate (69/69 passed).
+
+---
+
 ## [0.4.0] - 2026-11-23
 
 ### 🖥️ Native Desktop GUI Modernization (v0.4.0 Step 5)

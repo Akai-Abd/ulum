@@ -76,9 +76,9 @@ Seamlessly orchestrate software updates and clean removals across **APT**, **Fla
 Install the pre-built `.deb` package directly:
 
 ```bash
-sudo dpkg -i ulum_0.4.0_all.deb
+sudo dpkg -i ulum_0.4.1_all.deb
 # Or from the repository root:
-sudo dpkg -i dist/ulum_0.4.0_all.deb
+sudo dpkg -i dist/ulum_0.4.1_all.deb
 ```
 
 #### Option B: From Source (Development)
@@ -110,7 +110,7 @@ Running ULUM Health Diagnostics (8-Point Checklist)...
 ✓ 5. Database Storage: ~/.local/share/ulum/ulum.db (Schema v2, 64.0 KB, Integrity: OK)
 ✓ 6. Package Manager Locks: No active or stale package manager locks detected
 ✓ 7. Inventory & Scan Freshness: Inventory scan completed 0.4 hours ago
-✓ 8. ULUM Version & Updates: v0.4.0 (Up to date)
+✓ 8. ULUM Version & Updates: v0.4.1 (Up to date)
 
 ✓ All diagnostic checks passed (System Healthy).
 ```

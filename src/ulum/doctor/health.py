@@ -12,6 +12,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
 
+from ulum import __version__
 from ulum.core.system import detect_package_managers, get_system_info
 from ulum.db.database import get_db_path, init_db
 from ulum.db.repository import Repository
@@ -414,7 +415,7 @@ class SystemDoctor:
 
     @classmethod
     def check_version_and_updates(cls, check_online: bool = True) -> HealthCheckResult:
-        current_version = "0.4.0"
+        current_version = __version__
         latest_version = current_version
         update_available = False
         release_url = ""

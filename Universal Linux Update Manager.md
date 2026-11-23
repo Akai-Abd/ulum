@@ -1,8 +1,8 @@
 # Product Requirements Document (PRD)
 # Universal Linux Update Manager (ULUM)
 
-**Document version:** 0.4.0  
-**Status:** Complete (v0.4.0 Implemented & Verified)  
+**Document version:** 0.4.1  
+**Status:** Complete (v0.4.1 Implemented & Verified)  
 **Product type:** Open-source Linux CLI utility and Modern Native GTK Desktop GUI  
 **Initial target platforms:** Linux Mint 22.x and Ubuntu 24.04 LTS  
 **Primary implementation language:** Python 3.12+  
