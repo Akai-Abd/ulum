@@ -2,7 +2,7 @@
 # Universal Linux Update Manager (ULUM)
 
 **Document version:** 0.4.1  
-**Status:** Complete (v0.4.1 Implemented & Verified)  
+**Status:** Complete (v0.4.1 Implemented & Verified with Flatpak Runtime Support)  
 **Product type:** Open-source Linux CLI utility and Modern Native GTK Desktop GUI  
 **Initial target platforms:** Linux Mint 22.x and Ubuntu 24.04 LTS  
 **Primary implementation language:** Python 3.12+  
@@ -117,9 +117,11 @@ Safety requirements:
 
 Capabilities:
 
-- List installed Flatpak applications and runtimes.
-- Identify installation scope (user or system), remote, application ID, branch, and version where available.
-- Check and execute updates.
+- List installed Flatpak applications and runtimes (including GNOME Application Platform, Freedesktop SDK, Mesa).
+- Identify installation scope (user or system), remote, application ID, branch, commit hash, and version where available.
+- Qualify non-stable branch runtimes via `package_id//branch` to support parallel co-installed runtime branches (e.g. GNOME 50 and GNOME 51).
+- Fall back to branch and active/latest commit hash when semantic versions are absent.
+- Check and execute updates for both applications and shared runtimes in parity with Linux Mint Update Manager.
 - Uninstall selected applications.
 - Offer unused-runtime cleanup as a separately previewed action.
 - Offer application data deletion only with explicit approval.

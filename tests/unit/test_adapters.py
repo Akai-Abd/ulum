@@ -86,6 +86,34 @@ def test_flatpak_adapter_list_installed(monkeypatch):
     assert apps[1].package_id == "org.signal.Signal"
     assert apps[1].source_scope == ScopeType.USER
 
+def test_flatpak_adapter_list_and_update_runtime(monkeypatch):
+    adapter = FlatpakAdapter()
+    monkeypatch.setattr(adapter, "is_available", lambda: True)
+
+    def mock_run_cmd(cmd, **kwargs):
+        if "remote-ls" in cmd:
+            stdout = "org.gnome.Platform\t51\t\t8aba85f0de52\n"
+        else:
+            stdout = (
+                "com.obsproject.Studio\tOBS Studio\t33.0.3\tstable\tsystem\te0923f676887\n"
+                "org.gnome.Platform\tGNOME Application Platform version 51\t\t51\tsystem\t036e16faa6cd\n"
+            )
+        return subprocess.CompletedProcess(args=cmd, returncode=0, stdout=stdout, stderr="")
+
+    import ulum.adapters.flatpak as flatpak_module
+    monkeypatch.setattr(flatpak_module, "run_cmd", mock_run_cmd)
+
+    apps = adapter.list_installed()
+    assert len(apps) == 2
+    assert apps[0].package_id == "com.obsproject.Studio"
+    assert apps[1].package_id == "org.gnome.Platform//51"
+    assert apps[1].installed_version == "51 (036e16fa)"
+
+    updates = adapter.check_updates()
+    assert len(updates) == 1
+    assert updates[0].application.package_id == "org.gnome.Platform//51"
+    assert updates[0].available_version == "51 (8aba85f0)"
+
 def test_snap_adapter_list_installed(monkeypatch):
     adapter = SnapAdapter()
     monkeypatch.setattr(adapter, "is_available", lambda: True)

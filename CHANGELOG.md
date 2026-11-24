@@ -9,6 +9,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [0.4.1] - 2026-11-23
 
+### 📦 Flatpak Runtime Support & Branch Disambiguation (Linux Mint Parity)
+
+- **Comprehensive Flatpak Runtime Tracking (`FlatpakAdapter.list_installed`)**:
+  - Removed `--app` filter from `flatpak list`, indexing both standalone applications and shared platform runtimes (GNOME Application Platform, Freedesktop SDK, Mesa, codecs).
+  - Implemented branch-qualified identifiers (`package_id//branch`) for non-stable branches to support concurrent parallel installations (e.g. GNOME 50 and GNOME 51) without database unique constraint collisions.
+  - Automatically falls back to branch and active OSTree commit hash when semantic version metadata is empty.
+- **Runtime Update Discovery (`FlatpakAdapter.check_updates`)**:
+  - Enhanced `flatpak remote-ls --updates` parsing with `branch:f` and `commit:f` columns, resolving upstream platform updates even when `version` is absent.
+  - Enables full parity with the default Linux Mint Update Manager (`mintupdate`).
+- **Orchestrator Source Filtering (`UpdateOrchestrator.check_updates_detailed`)**:
+  - Ensured explicit `--source <name>` queries always evaluate available adapters even if temporarily excluded from global config.
+
 ### 🎨 GTK3 Dashboard Visual Overhaul & Interactive Navigation
 
 - **Lightweight CSS Provider & Modern Card Styling (`_init_styles`)**:

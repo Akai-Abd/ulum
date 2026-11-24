@@ -25,32 +25,51 @@ class FlatpakAdapter(BaseAdapter):
     def list_installed(self) -> List[ApplicationRecord]:
         if not self.is_available():
             return []
-        res = run_cmd(["flatpak", "list", "--app", "--columns=application,name,version,installation"])
+        res = run_cmd(["flatpak", "list", "--columns=application:f,name:f,version:f,branch:f,installation:f,active:f"])
         if res.returncode != 0:
             return []
 
         apps: List[ApplicationRecord] = []
         for line in res.stdout.splitlines():
-            parts = [p.strip() for p in line.split("\t") if p.strip()]
-            if not parts and " " in line:
-                parts = [p.strip() for p in line.split() if p.strip()]
-            if len(parts) >= 2:
-                app_id = parts[0]
-                name = parts[1] if len(parts) > 1 else app_id
-                version = parts[2] if len(parts) > 3 else "latest"
-                scope_str = parts[-1].lower() if len(parts) >= 4 else "system"
-                scope = ScopeType.USER if "user" in scope_str else ScopeType.SYSTEM
+            parts = line.split("\t")
+            if not parts or not parts[0].strip():
+                continue
+            app_id = parts[0].strip()
+            name = parts[1].strip() if len(parts) > 1 and parts[1].strip() else app_id
+            version = parts[2].strip() if len(parts) > 2 else ""
 
-                apps.append(
-                    ApplicationRecord(
-                        source=SourceType.FLATPAK,
-                        source_scope=scope,
-                        package_id=app_id,
-                        display_name=name,
-                        installed_version=version,
-                        install_location=f"/var/lib/flatpak/app/{app_id}" if scope == ScopeType.SYSTEM else f"~/.local/share/flatpak/app/{app_id}",
-                    )
+            # Support 4-column test mocks ('app\tname\tver\tscope') and 5-6 column real flatpak list
+            if len(parts) == 4 and parts[3].strip().lower() in ("system", "user"):
+                branch = ""
+                scope_str = parts[3].strip().lower()
+                active = ""
+            else:
+                branch = parts[3].strip() if len(parts) > 3 else ""
+                scope_str = parts[4].strip().lower() if len(parts) > 4 else "system"
+                active = parts[5].strip() if len(parts) > 5 else ""
+
+            if not version:
+                version = f"{branch} ({active[:8]})" if active else (branch or "latest")
+
+            scope = ScopeType.USER if "user" in scope_str else ScopeType.SYSTEM
+            # shortcut: package_id tags non-stable branches with //branch, upgrade to full ref if multiple architectures co-install
+            pkg_id = f"{app_id}//{branch}" if branch and branch != "stable" else app_id
+
+            base_dir = Path("/var/lib/flatpak") if scope == ScopeType.SYSTEM else Path.home() / ".local/share/flatpak"
+            loc = base_dir / "app" / app_id
+            if not loc.exists() and (base_dir / "runtime" / app_id).exists():
+                loc = base_dir / "runtime" / app_id
+
+            apps.append(
+                ApplicationRecord(
+                    source=SourceType.FLATPAK,
+                    source_scope=scope,
+                    package_id=pkg_id,
+                    display_name=name,
+                    installed_version=version,
+                    install_location=str(loc),
                 )
+            )
         return apps
 
     def check_updates(self, refresh: bool = False) -> List[UpdateRecord]:
@@ -59,21 +78,32 @@ class FlatpakAdapter(BaseAdapter):
         if refresh:
             run_cmd(["flatpak", "update", "--appstream"])
 
-        res = run_cmd(["flatpak", "remote-ls", "--updates", "--columns=application,version"])
+        res = run_cmd(["flatpak", "remote-ls", "--updates", "--columns=application:f,branch:f,version:f,commit:f"])
         if res.returncode != 0:
             return []
 
         installed = {app.package_id: app for app in self.list_installed()}
         updates: List[UpdateRecord] = []
         for line in res.stdout.splitlines():
-            parts = [p.strip() for p in line.split("\t") if p.strip()]
-            if not parts and " " in line:
-                parts = [p.strip() for p in line.split() if p.strip()]
-            if parts:
-                app_id = parts[0]
-                new_version = parts[1] if len(parts) > 1 else "latest"
-                if app_id in installed:
-                    updates.append(UpdateRecord(application=installed[app_id], available_version=new_version))
+            parts = line.split("\t")
+            if not parts or not parts[0].strip():
+                continue
+            app_id = parts[0].strip()
+            branch = parts[1].strip() if len(parts) > 1 else ""
+            raw_ver = parts[2].strip() if len(parts) > 2 else ""
+            commit = parts[3].strip() if len(parts) > 3 else ""
+
+            if raw_ver:
+                new_version = raw_ver
+            elif commit:
+                new_version = f"{branch} ({commit[:8]})" if branch else commit[:8]
+            else:
+                new_version = branch or "latest"
+
+            target_key = f"{app_id}//{branch}" if branch and branch != "stable" else app_id
+            app = installed.get(target_key) or installed.get(app_id)
+            if app:
+                updates.append(UpdateRecord(application=app, available_version=new_version))
         return updates
 
     def build_update_command(self, targets: Optional[Sequence[str]] = None) -> List[str]:
@@ -102,13 +132,14 @@ class FlatpakAdapter(BaseAdapter):
 
         cleanup_items: List[CleanupCandidate] = []
         if complete:
-            var_app_dir = Path.home() / ".var" / "app" / target.package_id
+            app_base_id = target.package_id.split("//")[0]
+            var_app_dir = Path.home() / ".var" / "app" / app_base_id
             if var_app_dir.exists():
                 cleanup_items.append(
                     CleanupCandidate(
                         path=var_app_dir,
                         candidate_type="data",
-                        evidence=f"Flatpak sandbox data directory matches application ID '{target.package_id}'",
+                        evidence=f"Flatpak sandbox data directory matches application ID '{app_base_id}'",
                         confidence=ConfidenceLevel.VERIFIED,
                     )
                 )

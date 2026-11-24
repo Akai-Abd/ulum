@@ -20,7 +20,7 @@ Seamlessly orchestrate software updates and clean removals across **APT**, **Fla
 
 ## 🌟 Key Features
 
-- **Unified Multi-Source Updates**: Check and upgrade packages across system repositories (APT), sandboxed runtimes (Flatpak), containerized snaps (Snap), and standalone binaries (AppImage) in one command.
+- **Unified Multi-Source Updates**: Check and upgrade packages across system repositories (APT), sandboxed applications and runtimes (Flatpak, including GNOME Platform, Freedesktop, Mesa), containerized snaps (Snap), and standalone binaries (AppImage) in one command.
 - **Concurrent Async Engine with Timeouts**: Scans all enabled package sources in parallel with 30-second bounded timeouts and 1-hour inventory caching.
 - **Security-First Tagging (`--security-only`)**: Identifies APT security updates directly from `-security` pocket origins and updates critical vulnerabilities first (`ulum update --security-only`).
 - **Broken PPA & 404 Repo Auto-Fix**: Diagnoses dead or expired repositories in `/etc/apt/sources.list.d/` and comments them out safely (`ulum doctor --fix-repos` or 1-click in GUI Diagnostics).
@@ -203,7 +203,7 @@ tests/unit/test_safety.py .....
 tests/unit/test_server.py .
 tests/unit/test_system_and_config.py ...
 
-============================== 69 passed ==============================
+============================== 70 passed ==============================
 ```
 
 ---

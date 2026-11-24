@@ -133,7 +133,10 @@ class Orchestrator:
     ) -> Dict[str, Any]:
         active_adapters = self.get_available_adapters()
         if source:
-            active_adapters = {s: active_adapters[s]} if source in active_adapters else {}
+            if source in self.adapters and self.adapters[source].is_available():
+                active_adapters = {source: self.adapters[source]}
+            else:
+                active_adapters = {}
 
         # 1-hour cache check when not refreshing and inspecting all sources
         CACHE_TTL_SECONDS = 3600
