@@ -635,6 +635,9 @@ class MainWindow(Gtk.Window):
         def done(results, error):
             if error:
                 show_error_dialog(self, "Update Failed", str(error))
+            elif not results or not any(r[1].success for r in results):
+                err_msg = "\n".join(r[1].error_summary or r[1].stderr or "Update command failed" for r in (results or []))
+                show_error_dialog(self, "Update Failed", err_msg or "No updates were applied.")
             else:
                 self.reload_updates_data()
                 show_info_dialog(self, "Update Complete", f"Successfully updated {qualified_id}.")
@@ -652,6 +655,9 @@ class MainWindow(Gtk.Window):
         def done(results, error):
             if error:
                 show_error_dialog(self, "Update Failed", str(error))
+            elif not results or not any(r[1].success for r in results):
+                err_msg = "\n".join(r[1].error_summary or r[1].stderr or "Update failed" for r in (results or []))
+                show_error_dialog(self, "Update Failed", err_msg or "No updates were processed.")
             else:
                 self.reload_updates_data()
                 show_info_dialog(self, "Bulk Update Complete", "All updates finished processing.")

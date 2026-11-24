@@ -18,8 +18,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Runtime Update Discovery (`FlatpakAdapter.check_updates`)**:
   - Enhanced `flatpak remote-ls --updates` parsing with `branch:f` and `commit:f` columns, resolving upstream platform updates even when `version` is absent.
   - Enables full parity with the default Linux Mint Update Manager (`mintupdate`).
-- **Orchestrator Source Filtering (`UpdateOrchestrator.check_updates_detailed`)**:
-  - Ensured explicit `--source <name>` queries always evaluate available adapters even if temporarily excluded from global config.
+- **Orchestrator Source Filtering & Execution (`UpdateOrchestrator`)**:
+  - Ensured explicit `--source <name>` queries and targeted `execute_updates` always execute on available host adapters even if excluded from general config.
+  - Improved GTK GUI update completion handling to verify execution success and surface actionable error summaries.
 
 ### 🎨 GTK3 Dashboard Visual Overhaul & Interactive Navigation
 

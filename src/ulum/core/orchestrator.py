@@ -277,8 +277,8 @@ class Orchestrator:
                 grouped.setdefault(src, []).append(pkg)
 
             for src, pkgs in grouped.items():
-                if src in active_adapters:
-                    adapter = active_adapters[src]
+                adapter = self.adapters.get(src)
+                if adapter and adapter.is_available():
                     started = datetime.datetime.now(datetime.timezone.utc).isoformat()
                     if dry_run:
                         cmd = adapter.build_update_command(pkgs)
@@ -316,8 +316,8 @@ class Orchestrator:
         else:
             sources_to_run = [source] if source else list(active_adapters.keys())
             for src in sources_to_run:
-                if src in active_adapters:
-                    adapter = active_adapters[src]
+                adapter = self.adapters.get(src)
+                if adapter and adapter.is_available():
                     started = datetime.datetime.now(datetime.timezone.utc).isoformat()
                     if dry_run:
                         cmd = adapter.build_update_command()
